@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 import nimesh.io
-from nimesh import Mesh
+from nimesh import CoordinateSystem, Mesh
 
 
 class TestGifTI(unittest.TestCase):
@@ -27,7 +27,7 @@ class TestGifTI(unittest.TestCase):
             [1, 2, 3],
         ]
 
-        mesh = Mesh(vertices, triangles)
+        mesh = Mesh(vertices, triangles, CoordinateSystem.SCANNER)
 
         # Work in a temporary directory. This guarantees cleanup even on error.
         with tempfile.TemporaryDirectory() as directory:
@@ -36,6 +36,9 @@ class TestGifTI(unittest.TestCase):
             filename = os.path.join(directory, 'mesh.gii')
             nimesh.io.save(filename, mesh)
             loaded = nimesh.io.load(filename)
+
+            # The coordinate system should not have changed.
+            self.assertEqual(mesh.coordinate_system, loaded.coordinate_system)
 
             # The loaded data should match the saved data. Because there is no
             # data manipulation, this should be bit perfect.
