@@ -1,10 +1,18 @@
 import numpy as np
+from enum import IntEnum
 from typing import Sequence
+
+
+class CoordinateSystem(IntEnum):
+    """The possible coordinate systems of meshes."""
+    SCANNER = 0
+    VOXEL = 1
 
 
 class Mesh(object):
 
-    def __init__(self, vertices: Sequence, triangles: Sequence):
+    def __init__(self, vertices: Sequence, triangles: Sequence,
+                 coordinate_system: CoordinateSystem = CoordinateSystem.VOXEL):
         """Triangle mesh of the cortical surface.
 
         The Mesh class represents a polygon mesh of the cortical surface
@@ -17,10 +25,14 @@ class Mesh(object):
             triangles: The triangles of the mesh. Must be a sequence that
                 can be converted to a numpy array of integers with a shape of
                 (M, 3) where M is the number of triangles.
+            coordinate_system (optional): The coordinate system of the
+                vertices (see CoordinateSystem). Defaults to VOXEL.
 
         Raises:
             TypeError: If vertices or triangles cannot be converted to numpy
                 arrays.
+            TypeError: If coordinate_system is not a CoordinateSystem member
+                value.
             ValueError: If vertices or triangles do not have a shape of (N, 3)
                 and (M, 3), respectively.
 
@@ -62,12 +74,23 @@ class Mesh(object):
             raise ValueError('\'triangles\' must have a shape of (M, 3) not '
                              '{}.'.format(triangles.shape))
 
+        if not isinstance(coordinate_system, CoordinateSystem):
+            raise TypeError('\'coordinate_system\' must be a member value of '
+                            'CoordinateSystem, not a {}.'
+                            .format(type(coordinate_system)))
+
         self._vertices = vertices
         self._triangles = triangles
+        self._coordinate_system = coordinate_system
 
     def __repr__(self):
         return 'Mesh: {} vertices, {} triangles'.format(self.nb_vertices,
                                                         self.nb_triangles)
+
+    @property
+    def coordinate_system(self) -> CoordinateSystem:
+        """Returns the coordinate system of the mesh."""
+        return self._coordinate_system
 
     @property
     def nb_triangles(self):
