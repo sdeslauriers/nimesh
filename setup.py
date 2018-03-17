@@ -10,5 +10,5 @@ setup(
     author_email='sam.deslauriers@gmail.com',
     description='A Python package to manipulate neuroimaging triangular '
                 'meshes.',
-    install_requires=['numpy']
+    install_requires=['numpy', 'nibabel']
 )
