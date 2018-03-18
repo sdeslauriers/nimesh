@@ -3,6 +3,66 @@ from enum import IntEnum
 from typing import Sequence
 
 
+class AffineTransform(object):
+
+    def __init__(self, transform_coord_sys: 'CoordinateSystem',
+                 affine: Sequence):
+        """Affine transformation from one coordinate system to another.
+
+        The AffineTransform represents an affine transformation to a new
+        stereotaxic space.
+
+        Args:
+            transform_coord_sys: The coordinate system of the data after the
+                application of the affine transformation.
+            affine: The affine transform as a numpy array with a shape of
+                (4, 4).
+
+        Raises:
+            TypeError: If the affine is none or not convertible to a a numpy
+                array of floats.
+            ValueError: If the affine does not have a shape of (4, 4).
+
+        Examples:
+
+            Create an affine transform to scanner space.
+
+            >>> import numpy as np
+            >>> from nimesh import AffineTransform, CoordinateSystem
+            >>> affine = np.eye(4)
+            >>> transform = AffineTransform(CoordinateSystem.SCANNER, affine)
+
+        """
+
+        # The affine must be convertible to a numpy array with a shape of
+        # (4, 4).
+        if affine is None:
+            raise TypeError('\'affine\' cannot be None.')
+
+        try:
+            affine = np.array(affine, dtype=np.float64)
+        except Exception:
+            raise TypeError('\'affine\' must be convertible to a numpy array '
+                            'of floats.')
+
+        if affine.ndim != 2 or affine.shape != (4, 4):
+            raise ValueError('\'affine\' must have a shape of (4, 4), '
+                             'not {}.'.format(affine.shape))
+
+        self._affine = affine
+        self._transform_coord_sys = transform_coord_sys
+
+    @property
+    def affine(self) -> np.array:
+        """Returns the affine transform as a numpy array."""
+        return self._affine.copy()
+
+    @property
+    def transform_coord_sys(self) -> 'CoordinateSystem':
+        """Returns the coord. system after the application of the affine."""
+        return self._transform_coord_sys
+
+
 class CoordinateSystem(IntEnum):
     """The possible coordinate systems of meshes."""
     SCANNER = 0
