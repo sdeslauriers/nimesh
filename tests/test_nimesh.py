@@ -2,7 +2,30 @@ import unittest
 
 import numpy as np
 
-from nimesh import Mesh
+from nimesh import AffineTransform, CoordinateSystem, Mesh
+
+
+class TestAffineTransform(unittest.TestCase):
+    """Test the nimesh.AffineTransform class."""
+
+    def test_init(self):
+        """Test the __init__ method."""
+
+        # Create a basic transform to scanner.
+        affine = np.eye(4)
+        transform = AffineTransform(CoordinateSystem.SCANNER, affine)
+
+        np.testing.assert_array_equal(transform.affine, affine)
+        self.assertEqual(transform.transform_coord_sys,
+                         CoordinateSystem.SCANNER)
+
+        # The affine cannot be None.
+        self.assertRaises(TypeError, AffineTransform,
+                          CoordinateSystem.SCANNER, None)
+
+        # The affine must be (4, 4).
+        self.assertRaises(ValueError, AffineTransform,
+                          CoordinateSystem.SCANNER, [[0, 0], [0, 0]])
 
 
 class TestMesh(unittest.TestCase):
