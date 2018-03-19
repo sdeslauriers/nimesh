@@ -62,3 +62,54 @@ class TestMesh(unittest.TestCase):
         self.assertRaises(ValueError, Mesh, incorrect_vertices, triangles)
         incorrect_triangles = np.array(triangles)[:, :2]
         self.assertRaises(ValueError, Mesh, vertices, incorrect_triangles)
+
+    def test_transform_to(self):
+        """Test the transform_to method."""
+
+        # Create a simple mesh with two triangles.
+        vertices = [
+            [0, 0, 0],
+            [1, 0, 0],
+            [1, 1, 0],
+            [0, 1, 0],
+        ]
+
+        triangles = [
+            [0, 1, 2],
+            [1, 2, 3],
+        ]
+
+        mesh = Mesh(vertices, triangles)
+
+        # Add a transform to scanner space.
+        affine = [
+            [1, 0, 0, 1],
+            [0, 1, 0, 2],
+            [0, 0, 1, 3],
+            [0, 0, 0, 1],
+        ]
+        transform = AffineTransform(CoordinateSystem.SCANNER, affine)
+        mesh.add_transform(transform)
+
+        # Change the coordinate system.
+        mesh.transform_to(CoordinateSystem.SCANNER)
+        expected_vertices = [
+            [1, 2, 3],
+            [2, 2, 3],
+            [2, 3, 3],
+            [1, 3, 3],
+        ]
+
+        self.assertEqual(mesh.coordinate_system, CoordinateSystem.SCANNER)
+        np.testing.assert_array_almost_equal(mesh.vertices, expected_vertices)
+
+        # Going back to the original coordinate system should yield the
+        # original mesh.
+        mesh.transform_to(CoordinateSystem.VOXEL)
+        self.assertEqual(mesh.coordinate_system, CoordinateSystem.VOXEL)
+        np.testing.assert_array_almost_equal(mesh.vertices, vertices)
+
+        # Transforming to the current coordinate system does nothing.
+        mesh.transform_to(CoordinateSystem.VOXEL)
+        self.assertEqual(mesh.coordinate_system, CoordinateSystem.VOXEL)
+        np.testing.assert_array_almost_equal(mesh.vertices, vertices)
