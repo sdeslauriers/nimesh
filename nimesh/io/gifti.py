@@ -2,7 +2,7 @@ import warnings
 
 import nibabel as nib
 
-from nimesh import CoordinateSystem, Mesh
+from nimesh import AffineTransform, CoordinateSystem, Mesh
 
 
 def load(filename: str) -> Mesh:
@@ -43,16 +43,9 @@ def load(filename: str) -> Mesh:
     vertex_array = vertex_arrays[0]
     vertices = vertex_array.data
 
-    # Get the coordinate system from the metadata of the vertex array. If
-    # there is none, assume voxel space.
-    metadata = vertex_array.meta.metadata
-    if 'cs' in metadata:
-        coordinate_system = CoordinateSystem(int(metadata['cs']))
-    else:
-        warnings.warn('The file {} does not contain a reference coordinate '
-                      'system. Assuming voxel space.'.format(filename),
-                      RuntimeWarning)
-        coordinate_system = CoordinateSystem.VOXEL
+    # Get the coordinate system from the transform
+    gifti_transform = vertex_array.coordsys
+    coordinate_system = CoordinateSystem(gifti_transform.dataspace)
 
     # Get the triangles array. If there is more than one, warn the user and
     # use the first one.
@@ -70,7 +63,17 @@ def load(filename: str) -> Mesh:
 
     triangles = triangle_arrays[0].data
 
-    return Mesh(vertices, triangles, coordinate_system)
+    # Create the mesh.
+    mesh = Mesh(vertices, triangles, coordinate_system)
+
+    # Add the transform if one was saved.
+    if gifti_transform.dataspace != gifti_transform.xformspace:
+        transform = AffineTransform(
+            CoordinateSystem(gifti_transform.xformspace),
+            gifti_transform.xform)
+        mesh.add_transform(transform)
+
+    return mesh
 
 
 def save(filename: str, mesh: Mesh) -> None:
@@ -95,11 +98,30 @@ def save(filename: str, mesh: Mesh) -> None:
         'cs': str(mesh.coordinate_system.value)
     }
 
+    # For now, the GifTI implementation of nibabel seems to support only a
+    # single transform. If the mesh has more than one, warn the user and
+    # save the first one.
+    transforms = mesh.transforms
+    if len(transforms) > 1:
+        warnings.warn('The mesh has more than one transform but GifTI only '
+                      'supports a single transform. Only the first one will '
+                      'be saved.')
+
+    if len(transforms) != 0:
+        coordinate_system = nib.gifti.GiftiCoordSystem(
+            mesh.coordinate_system.value,
+            transforms[0].transform_coord_sys.value,
+            transforms[0].affine)
+    else:
+        coordinate_system = nib.gifti.GiftiCoordSystem(mesh.coordinate_system,
+                                                       mesh.coordinate_system)
+
     vertices_array = nib.gifti.GiftiDataArray(
         mesh.vertices,
         intent='NIFTI_INTENT_POINTSET',
         datatype='NIFTI_TYPE_FLOAT64',
-        meta=meta
+        meta=meta,
+        coordsys=coordinate_system
     )
     gii.add_gifti_data_array(vertices_array)
 

@@ -142,6 +142,7 @@ class Mesh(object):
         self._vertices = vertices
         self._triangles = triangles
         self._coordinate_system = coordinate_system
+        self._transforms = []
 
     def __repr__(self):
         return 'Mesh: {} vertices, {} triangles'.format(self.nb_vertices,
@@ -163,6 +164,11 @@ class Mesh(object):
         return len(self._vertices)
 
     @property
+    def transforms(self):
+        """Returns the available transform to other coordinate systems."""
+        return self._transforms.copy()
+
+    @property
     def triangles(self):
         """Returns a copy of the mesh's triangles."""
         return self._triangles.copy()
@@ -171,3 +177,89 @@ class Mesh(object):
     def vertices(self):
         """Returns a copy of the mesh's vertices."""
         return self._vertices.copy()
+
+    def add_transform(self, transform: AffineTransform):
+        """Adds a transform to a new coordinate system.
+
+        Adds a new transform to the mesh that takes it from its current
+        coordinate system to another.
+
+        Args:
+            transform: The affine transform from the current coordinate system
+                to a new one.
+
+        Raises:
+            TypeError: If the transform is not an AffineTransform.
+            ValueError: If a transform to the new coordinate system already
+                exists or if the transform is to the current coordinate system.
+
+        """
+
+        if not isinstance(transform, AffineTransform):
+            raise TypeError('\'transform\' must be an instance of '
+                            'AffineTransform, not {}.'
+                            .format(type(transform)))
+
+        # Verify if the transform is to a new coordinate system.
+        if transform.transform_coord_sys == self.coordinate_system:
+            raise ValueError('A transform to the current coordinate system '
+                             'cannot be added.')
+
+        # Verify if there is already a transform to this coordiante system.
+        targets = [t.transform_coord_sys for t in self._transforms]
+        if transform.transform_coord_sys in targets:
+            raise ValueError('A transform to {} already exists.'
+                             .format(transform.transform_coord_sys))
+
+        self._transforms.append(transform)
+
+    def transform_to(self, coordinate_system: CoordinateSystem):
+        """Transforms the mesh to a another coordinate system.
+
+        Transforms the mesh from its current coordinate system to another. A
+        transform to the new coordinate system must have been added to the
+        mesh with `add_transform`.
+
+        Args:
+             coordinate_system: The target coordinate system.
+
+        Raises:
+            ValueError: If no transform to the requested coordinate system
+                exits.
+        """
+
+        # If we are already in this coordinate system, do nothing.
+        if coordinate_system == self.coordinate_system:
+            return
+
+        # Get the requested transform.
+        transform = next((t for t in self._transforms
+                          if t.transform_coord_sys == coordinate_system), None)
+
+        if transform is None:
+            raise ValueError('No transform is available to transform to {}.'
+                             .format(coordinate_system))
+
+        # Apply the transform to the vertices.
+        homogeneous_vertices = np.hstack((self._vertices,
+                                          np.ones((self.nb_vertices, 1))))
+        new_vertices = np.dot(transform.affine, homogeneous_vertices.T)
+        self._vertices = new_vertices[:3, :].T
+
+        # Remove the transform form the list because it is no longer valid.
+        self._transforms.remove(transform)
+
+        # Apply inverse of the transform to the other transform so they still
+        # project to the correct coordinate system.
+        inv = np.linalg.inv(transform.affine)
+
+        def project_transform(t):
+            return AffineTransform(t.transform_coord_sys,
+                                   np.dot(inv, t.affine))
+        self._transforms = [project_transform(t) for t in self._transforms]
+
+        # Add the inverse of the transform to go back to the original
+        # coordinate system and the change the current coordinate system.
+        new_transform = AffineTransform(self.coordinate_system, inv)
+        self._coordinate_system = coordinate_system
+        self.add_transform(new_transform)
