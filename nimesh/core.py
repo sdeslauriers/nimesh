@@ -67,6 +67,8 @@ class CoordinateSystem(IntEnum):
     """The possible coordinate systems of meshes."""
     SCANNER = 0
     VOXEL = 1
+    RAS = 2
+    LPS = 3
 
 
 class Mesh(object):

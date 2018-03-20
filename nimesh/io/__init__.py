@@ -2,6 +2,7 @@ import os.path
 
 from nimesh import Mesh
 from nimesh.io import gifti
+from nimesh.io import freesurfer
 
 
 def load(filename: str) -> Mesh:
