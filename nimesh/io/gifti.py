@@ -76,7 +76,10 @@ def load(filename: str) -> Mesh:
     return mesh
 
 
-def save(filename: str, mesh: Mesh) -> None:
+def save(filename: str, mesh: Mesh,
+         anatomical_structure_primary: str = 'Cortex',
+         anatomical_structure_secondary: str = 'GrayWhite',
+         geometric_type: str = 'Anatomical') -> None:
     """Save a mesh to a GifTI file.
 
     Saves the mesh and its metadata to a GifTI file.
@@ -85,6 +88,11 @@ def save(filename: str, mesh: Mesh) -> None:
         filename: The name of the file were the mesh will be saved. If it
             exists, it will be overwritten.
         mesh: The mesh to save.
+        anatomical_structure_primary (optional): The tag of the primary
+            anatomical structure for workbench.
+        anatomical_structure_secondary (optional): The tag of the secondary
+            anatomical structure for workbench.
+        geometric_type (optional): The geometric type for workbench.
 
     """
 
@@ -117,18 +125,30 @@ def save(filename: str, mesh: Mesh) -> None:
                                                        mesh.coordinate_system)
 
     vertices_array = nib.gifti.GiftiDataArray(
-        mesh.vertices,
+        mesh.vertices.astype('f4'),
         intent='NIFTI_INTENT_POINTSET',
-        datatype='NIFTI_TYPE_FLOAT64',
+        datatype='NIFTI_TYPE_FLOAT32',
         meta=meta,
         coordsys=coordinate_system
     )
+
+    # Add metadata for Workbench. In a surface file, the meta data of the
+    # structure is in the meta of the point set array.
+    vertices_array.meta.data.append(
+        nib.gifti.GiftiNVPairs('AnatomicalStructurePrimary',
+                               anatomical_structure_primary))
+    vertices_array.meta.data.append(
+        nib.gifti.GiftiNVPairs('AnatomicalStructureSecondary',
+                               anatomical_structure_secondary))
+    vertices_array.meta.data.append(
+        nib.gifti.GiftiNVPairs('GeometricType', geometric_type))
+
     gii.add_gifti_data_array(vertices_array)
 
     triangles_array = nib.gifti.GiftiDataArray(
-        mesh.triangles,
+        mesh.triangles.astype('i4'),
         intent='NIFTI_INTENT_TRIANGLE',
-        datatype='NIFTI_TYPE_UINT64')
+        datatype='NIFTI_TYPE_INT32')
     gii.add_gifti_data_array(triangles_array)
 
     nib.save(gii, filename)
