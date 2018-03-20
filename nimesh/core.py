@@ -1,6 +1,6 @@
 import numpy as np
 from enum import IntEnum
-from typing import Sequence
+from typing import List, Sequence
 
 
 class AffineTransform(object):
@@ -146,7 +146,7 @@ class Mesh(object):
         self._coordinate_system = coordinate_system
         self._transforms = []
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'Mesh: {} vertices, {} triangles'.format(self.nb_vertices,
                                                         self.nb_triangles)
 
@@ -156,27 +156,27 @@ class Mesh(object):
         return self._coordinate_system
 
     @property
-    def nb_triangles(self):
+    def nb_triangles(self) -> int:
         """Returns the number of triangles of the mesh."""
         return len(self._triangles)
 
     @property
-    def nb_vertices(self):
+    def nb_vertices(self) -> int:
         """Returns the number of vertices of the mesh."""
         return len(self._vertices)
 
     @property
-    def transforms(self):
+    def transforms(self) -> List[AffineTransform]:
         """Returns the available transform to other coordinate systems."""
         return self._transforms.copy()
 
     @property
-    def triangles(self):
+    def triangles(self) -> np.array:
         """Returns a copy of the mesh's triangles."""
         return self._triangles.copy()
 
     @property
-    def vertices(self):
+    def vertices(self) -> np.array:
         """Returns a copy of the mesh's vertices."""
         return self._vertices.copy()
 
