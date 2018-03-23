@@ -9,9 +9,10 @@ from nimesh import CoordinateSystem, Mesh
 def load(surface: str):
     """Loads a FreeSurfer surface mesh."""
 
-    # Load the vertices and remove the CRAS translation.
+    # Load the vertices and remove the CRAS translation if it exists.
     vertices, triangles, meta, info = nibfs.read_geometry(surface, True, True)
-    vertices += meta['cras']
+    if 'cras' in meta:
+        vertices += meta['cras']
 
     # We supposed the FreeSurfer surface is in RAS.
     mesh = Mesh(vertices, triangles, CoordinateSystem.RAS)
