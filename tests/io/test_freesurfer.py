@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 import nimesh
-from nimesh import AffineTransform, CoordinateSystem
+from nimesh import AffineTransform, CoordinateSystem, Segmentation
 
 from .test_gifti import minimal_mesh
 
@@ -35,3 +35,20 @@ class TestFreeSurfer(unittest.TestCase):
             self.assertEqual(mesh.nb_vertices, loaded.nb_vertices)
             self.assertEqual(mesh.nb_triangles, loaded.nb_triangles)
             self.assertEqual(mesh.coordinate_system, loaded.coordinate_system)
+
+    def test_segmentation_save_load(self):
+        """Test saving and loading a segmentation."""
+
+        segmentation = Segmentation('test.annot', [0, 0, 1, 1])
+
+        # Work in a temporary directory. This guarantees cleanup even on error.
+        with tempfile.TemporaryDirectory() as directory:
+
+            # Save and reload the test data.
+            filename = os.path.join(directory, segmentation.name)
+            nimesh.io.freesurfer.save_segmentation(filename, segmentation)
+            loaded = nimesh.io.freesurfer.load_segmentation(filename)
+
+            np.testing.assert_array_almost_equal(segmentation.labels,
+                                                 loaded.labels)
+            self.assertEqual(segmentation.name, loaded.name)
