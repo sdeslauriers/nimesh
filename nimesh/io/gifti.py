@@ -2,7 +2,7 @@ import warnings
 
 import nibabel as nib
 
-from nimesh import AffineTransform, CoordinateSystem, Mesh
+from nimesh import AffineTransform, CoordinateSystem, Mesh, Segmentation
 
 
 def load(filename: str) -> Mesh:
@@ -74,6 +74,44 @@ def load(filename: str) -> Mesh:
         mesh.add_transform(transform)
 
     return mesh
+
+
+def load_segmentation(filename: str) -> Segmentation:
+    """Loads a segmentation from a GifTI file.
+
+    Loads the segmentation of a mesh from a GifTI file without loading the
+    mesh data.
+
+    Args:
+        filename: The name of the file from which to load the segmentation.
+
+    Returns:
+        segmentation: The segmentation loaded from the GifTI file.
+
+    Raises:
+        ValueError: If the file does not contain a segmentation.
+
+    """
+
+    gii = nib.load(filename)
+
+    # Get the labels array. If there is more than one, warn the user and
+    # use the first one.
+    label_arrays = gii.get_arrays_from_intent('NIFTI_INTENT_LABEL')
+
+    if len(label_arrays) == 0:
+        raise ValueError('The file {} does not contain any segmentation data.'
+                         .format(filename))
+
+    elif len(label_arrays) > 1:
+        warnings.warn('The file {} contains more than one label array. The '
+                      'first one was used. Proceed with caution.'
+                      .format(filename),
+                      RuntimeWarning)
+    label_array = label_arrays[0]
+    labels = label_array.data
+
+    return Segmentation('test', labels)
 
 
 def save(filename: str, mesh: Mesh,
@@ -152,3 +190,64 @@ def save(filename: str, mesh: Mesh,
     gii.add_gifti_data_array(triangles_array)
 
     nib.save(gii, filename)
+
+
+def save_segmentation(filename: str,
+                      segmentation: Segmentation,
+                      anatomical_structure_primary: str = 'Cortex',
+                      anatomical_structure_secondary: str = 'GrayWhite',
+                      geometric_type: str = 'Anatomical') -> None:
+    """Save a segmentation to a GifTI image.
+
+    Save a the segmentation of a mesh into a GifTI file without saving the
+    mesh itself.
+
+    Args:
+        filename: The name of the file where the segmentation is saved. If
+            it exists, it will be overwritten.
+        segmentation: The segmentation to save.
+        anatomical_structure_primary: The name of the primary anatomical
+            structure the segmentation refers to. For workbench.
+        anatomical_structure_secondary: The name of the secondary anatomical
+            structure the segmentation refers to. For workbench.
+        geometric_type: The geometric type of the structure. For workbench.
+
+    """
+
+    gii = nib.gifti.GiftiImage()
+
+    # In a label file, the meta data of the structure is in the
+    # meta of the file.
+    gii.meta.data.append(
+        nib.gifti.GiftiNVPairs('AnatomicalStructurePrimary',
+                               anatomical_structure_primary))
+    gii.meta.data.append(
+        nib.gifti.GiftiNVPairs('AnatomicalStructureSecondary',
+                               anatomical_structure_secondary))
+    gii.meta.data.append(
+        nib.gifti.GiftiNVPairs('GeometricType',
+                               geometric_type))
+
+    add_segmentation_to_gii(segmentation, gii)
+
+    nib.save(gii, filename)
+
+
+def add_segmentation_to_gii(segmentation: Segmentation,
+                            gii: nib.gifti.GiftiImage):
+    """Adds a segmentation to a nibabel GifTI object.
+
+    Add the segmentation data to a nibabel GifTI object by adding a new data
+    array.
+
+    Args:
+        segmentation: The segmentation to add to the GifTI object.
+        gii: The GifTI object where the segmentation is added.
+
+    """
+
+    label_array = nib.gifti.GiftiDataArray(
+        segmentation.labels,
+        intent='NIFTI_INTENT_LABEL',
+        datatype='NIFTI_TYPE_INT32')
+    gii.add_gifti_data_array(label_array)

@@ -2,6 +2,8 @@ import numpy as np
 from enum import IntEnum
 from typing import List, Sequence
 
+from .mixins import Named
+
 
 class AffineTransform(object):
 
@@ -144,7 +146,9 @@ class Mesh(object):
         self._vertices = vertices
         self._triangles = triangles
         self._coordinate_system = coordinate_system
+
         self._transforms = []
+        self._segmentations = []
 
     def __repr__(self) -> str:
         return 'Mesh: {} vertices, {} triangles'.format(self.nb_vertices,
@@ -179,6 +183,30 @@ class Mesh(object):
     def vertices(self) -> np.array:
         """Returns a copy of the mesh's vertices."""
         return self._vertices.copy()
+
+    def add_segmentation(self, segmentation: 'Segmentation'):
+        """Adds a segmentation to the mesh.
+
+        Args:
+            segmentation: The segmentation of the mesh to add.
+
+        Raises:
+            TypeError: If segmentation is not an instance of Segmentation.
+            ValueError: If a segmentation with the same name already exists.
+
+        """
+
+        if not isinstance(segmentation, Segmentation):
+            raise TypeError('\'segmentation\' must be an instance of '
+                            'Segmentation, not {}.'
+                            .format(type(segmentation)))
+
+        if segmentation.name in [s.name for s in self._segmentations]:
+            raise ValueError('A segmentation with the name {} already exists '
+                             'in the mesh.'
+                             .format(segmentation.name))
+
+        self._segmentations.append(segmentation)
 
     def add_transform(self, transform: AffineTransform):
         """Adds a transform to a new coordinate system.
@@ -265,3 +293,46 @@ class Mesh(object):
         new_transform = AffineTransform(self.coordinate_system, inv)
         self._coordinate_system = coordinate_system
         self.add_transform(new_transform)
+
+
+class Segmentation(Named):
+
+    def __init__(self, name: str, labels: Sequence):
+        """Segmentation of a mesh using labels.
+
+        A segmentation of a mesh represented using a list of integers,
+        one for each vertex.
+
+        Args:
+            name: The name of the segmentation.
+            labels: The array of labels of the segmentation, one for each
+                voxel. Must be a sequence convertible to a numpy array of
+                integers with a shape of (N,).
+
+        Raises:
+            TypeError: If the labels cannot be converted to an array of
+                integers.
+            ValueError: If the labels cannot be converted to an array with a
+                shape of (N,).
+        """
+
+        super().__init__(name)
+
+        # The labels must be convertible to a numpy array of integers.
+        try:
+            labels = np.array(labels, np.int32)
+        except Exception:
+            raise TypeError('\'labels\' must be convertible to a numpy array '
+                            'of integers.')
+
+        # The shape of the labels must be (N,).
+        if labels.ndim != 1:
+            raise ValueError('\'labels\' must have a shape of (N,), not {}.'
+                             .format(labels.shape))
+
+        self._labels = labels
+
+    @property
+    def labels(self) -> np.array:
+        """Returns the labels of the segmentation."""
+        return self._labels.copy()
