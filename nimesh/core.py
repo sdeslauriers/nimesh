@@ -170,6 +170,11 @@ class Mesh(object):
         return len(self._vertices)
 
     @property
+    def segmentations(self) -> List['Segmentation']:
+        """Returns the segmentations of the mesh."""
+        return self._segmentations.copy()
+
+    @property
     def transforms(self) -> List[AffineTransform]:
         """Returns the available transform to other coordinate systems."""
         return self._transforms.copy()

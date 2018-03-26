@@ -8,7 +8,9 @@ from nimesh import AffineTransform, CoordinateSystem, Mesh, Segmentation
 def load(filename: str) -> Mesh:
     """Loads a mesh from a GifTI file
 
-    Loads the vertices and triangles of a mesh in the GifTI file format.
+    Loads the vertices and triangles of a mesh in the GifTI file format. If
+    a transform or segmentation is contained in the file, they will also be
+    loaded.
 
     Args:
         filename: The name of the GifTI file to load.
@@ -73,6 +75,11 @@ def load(filename: str) -> Mesh:
             gifti_transform.xform)
         mesh.add_transform(transform)
 
+    # Add the segmentation if one was saved.
+    segmentation = _create_segmentation_from_gii(gii)
+    if segmentation is not None:
+        mesh.add_segmentation(segmentation)
+
     return mesh
 
 
@@ -95,23 +102,13 @@ def load_segmentation(filename: str) -> Segmentation:
 
     gii = nib.load(filename)
 
-    # Get the labels array. If there is more than one, warn the user and
-    # use the first one.
-    label_arrays = gii.get_arrays_from_intent('NIFTI_INTENT_LABEL')
+    segmentation = _create_segmentation_from_gii(gii)
 
-    if len(label_arrays) == 0:
+    if segmentation is None:
         raise ValueError('The file {} does not contain any segmentation data.'
                          .format(filename))
 
-    elif len(label_arrays) > 1:
-        warnings.warn('The file {} contains more than one label array. The '
-                      'first one was used. Proceed with caution.'
-                      .format(filename),
-                      RuntimeWarning)
-    label_array = label_arrays[0]
-    labels = label_array.data
-
-    return Segmentation('test', labels)
+    return segmentation
 
 
 def save(filename: str, mesh: Mesh,
@@ -143,6 +140,17 @@ def save(filename: str, mesh: Mesh,
     meta = {
         'cs': str(mesh.coordinate_system.value)
     }
+
+    # The GifTI file format only allows saving one segmentation. If the mesh
+    # contains more that one, warn the user and save only the first one.
+    segmentations = mesh.segmentations
+    if len(segmentations) > 1:
+        warnings.warn('The mesh has more that one segmentation, but GifTI '
+                      'only supports one segmentation per file. Only the '
+                      'first segmentation will be saved.')
+
+    if len(segmentations) != 0:
+        add_segmentation_to_gii(segmentations[0], gii)
 
     # For now, the GifTI implementation of nibabel seems to support only a
     # single transform. If the mesh has more than one, warn the user and
@@ -246,8 +254,46 @@ def add_segmentation_to_gii(segmentation: Segmentation,
 
     """
 
+    # Save the name of the segmentation in the metadata of the array.
+    meta = nib.gifti.GiftiMetaData.from_dict({'name': segmentation.name})
+
     label_array = nib.gifti.GiftiDataArray(
         segmentation.labels,
         intent='NIFTI_INTENT_LABEL',
-        datatype='NIFTI_TYPE_INT32')
+        datatype='NIFTI_TYPE_INT32',
+        meta=meta)
+
     gii.add_gifti_data_array(label_array)
+
+
+def _create_segmentation_from_gii(gii) -> Segmentation:
+    """Creates a segmentation from a nibabel GifTI object.
+
+    Creates a new segmentation from the data array of a nibabel GifTI
+    object. If none of the data arrays have an intent of NIFTI_INTENT_LABEL,
+    None is returned.
+
+    Args:
+        gii: The nibabel GifTI object from which to create the segmentation.
+
+    Returns:
+        segmentation: The loaded segmentation or None.
+
+    """
+
+    # Get the labels array. If there is more than one, warn the user and
+    # use the first one.
+    label_arrays = gii.get_arrays_from_intent('NIFTI_INTENT_LABEL')
+
+    if len(label_arrays) == 0:
+        return None
+
+    elif len(label_arrays) > 1:
+        warnings.warn('The file contains more than one label array. The '
+                      'first one was used. Proceed with caution.',
+                      RuntimeWarning)
+    label_array = label_arrays[0]
+    labels = label_array.data
+    name = label_array.metadata['name']
+
+    return Segmentation(name, labels)
