@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 import nimesh.io
-from nimesh import AffineTransform, CoordinateSystem, Mesh
+from nimesh import AffineTransform, CoordinateSystem, Mesh, Segmentation
 
 
 def minimal_mesh():
@@ -89,3 +89,20 @@ class TestGifTI(unittest.TestCase):
                              CoordinateSystem.VOXEL)
             np.testing.assert_array_almost_equal(loaded_transform.affine,
                                                  affine)
+
+    def test_segmentation_save_load(self):
+        """Test saving a loading segmentations."""
+
+        segmentation = Segmentation('test', [0, 0, 1, 1, 2, 2, 3, 3])
+
+        # Work in a temporary directory. This guarantees cleanup even on error.
+        with tempfile.TemporaryDirectory() as directory:
+
+            # Save the mesh and reload it.
+            filename = os.path.join(directory, 'segmentation.gii')
+            nimesh.io.gifti.save_segmentation(filename, segmentation)
+            loaded = nimesh.io.gifti.load_segmentation(filename)
+
+            # The loaded data should match the saved data.
+            np.testing.assert_array_almost_equal(segmentation.labels,
+                                                 loaded.labels)
