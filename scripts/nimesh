@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+
+import argparse
+
+import vtk
+
+import nimesh
+
+
+def view_mesh(mesh: nimesh.Mesh):
+    """Displays a mesh in an interactive window.
+
+    Displays a mesh in an interactive window. This function is intended to be
+    used as a quality assurrance tool, and not for full featured visualization.
+
+    Args:
+        mesh: The mesh to view.
+
+    """
+
+    # Create a new vtk renderer and rendering window.
+    renderer = vtk.vtkRenderer()
+    renderer.SetViewport(0.0, 0.0, 1.0, 1.0)
+    renderer.SetBackground(0.0, 0.0, 0.0)
+    rendering_window = vtk.vtkRenderWindow()
+    rendering_window.AddRenderer(renderer)
+
+    # Allow the user to interact with the mesh.
+    interactor = vtk.vtkRenderWindowInteractor()
+    interactor.SetRenderWindow(rendering_window)
+    interactor.SetInteractorStyle(
+        vtk.vtkInteractorStyleTrackballCamera())
+
+    # Transfer the meshes vertices to the vtk format.
+    points = vtk.vtkPoints()
+    for vertex in mesh.vertices:
+        points.InsertNextPoint(*vertex)
+
+    # Create the triangles of the surface.
+    triangles = vtk.vtkCellArray()
+    for triangle in mesh.triangles:
+        vtk_triangle = vtk.vtkTriangle()
+        vtk_triangle.GetPointIds().SetId(0, triangle[0])
+        vtk_triangle.GetPointIds().SetId(1, triangle[1])
+        vtk_triangle.GetPointIds().SetId(2, triangle[2])
+        triangles.InsertNextCell(vtk_triangle)
+
+    # Create the poly data, mapper, and actor.
+    poly_data = vtk.vtkPolyData()
+    poly_data.SetPoints(points)
+    poly_data.SetPolys(triangles)
+
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputData(poly_data)
+
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+
+    # Add the actor to the renderer.
+    renderer.AddActor(actor)
+
+    # Start rendering.
+    rendering_window.Render()
+    interactor.Start()
+
+    # Cleanup when the user closes the window.
+    rendering_window.Finalize()
+    interactor.TerminateApp()
+
+
+if __name__ == '__main__':
+
+    # Create the argument parser.
+    parser = argparse.ArgumentParser()
+    parser.add_argument('filename')
+
+    args = parser.parse_args()
+
+    # Create the mesh and display it.
+    mesh = nimesh.io.load(args.filename)
+
+    view_mesh(mesh)
