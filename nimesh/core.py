@@ -302,7 +302,7 @@ class Mesh(object):
 
 class Segmentation(Named):
 
-    def __init__(self, name: str, labels: Sequence):
+    def __init__(self, name: str, keys: Sequence[int]):
         """Segmentation of a mesh using labels.
 
         A segmentation of a mesh represented using a list of integers,
@@ -310,7 +310,7 @@ class Segmentation(Named):
 
         Args:
             name: The name of the segmentation.
-            labels: The array of labels of the segmentation, one for each
+            keys: The array of labels of the segmentation, one for each
                 voxel. Must be a sequence convertible to a numpy array of
                 integers with a shape of (N,).
 
@@ -323,21 +323,21 @@ class Segmentation(Named):
 
         super().__init__(name)
 
-        # The labels must be convertible to a numpy array of integers.
+        # The keys must be convertible to a numpy array of integers.
         try:
-            labels = np.array(labels, np.int32)
+            keys = np.array(keys, np.int32)
         except Exception:
-            raise TypeError('\'labels\' must be convertible to a numpy array '
+            raise TypeError('\'keys\' must be convertible to a numpy array '
                             'of integers.')
 
-        # The shape of the labels must be (N,).
-        if labels.ndim != 1:
-            raise ValueError('\'labels\' must have a shape of (N,), not {}.'
-                             .format(labels.shape))
+        # The shape of the keys must be (N,).
+        if keys.ndim != 1:
+            raise ValueError('\'keys\' must have a shape of (N,), not {}.'
+                             .format(keys.shape))
 
-        self._labels = labels
+        self._keys = keys
 
     @property
-    def labels(self) -> np.array:
-        """Returns the labels of the segmentation."""
-        return self._labels.copy()
+    def keys(self) -> np.array:
+        """Returns the key of each vertex of the segmentation."""
+        return self._keys.copy()

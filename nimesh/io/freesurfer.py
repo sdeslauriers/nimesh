@@ -98,8 +98,8 @@ def save_segmentation(filename: str, segmentation: Segmentation):
 
     """
 
-    labels = segmentation.labels
-    ctab = np.array([(i, 0, 0, 0, i) for i in np.unique(labels)],
+    keys = segmentation.keys
+    ctab = np.array([(i, 0, 0, 0, i) for i in np.unique(keys)],
                     dtype=np.int16)
-    names = [str(i) for i in np.unique(labels)]
-    nibfs.write_annot(filename, labels, ctab, names)
+    names = [str(i) for i in np.unique(keys)]
+    nibfs.write_annot(filename, keys, ctab, names)

@@ -120,8 +120,8 @@ class TestGifTI(unittest.TestCase):
             loaded_segmentation = loaded.segmentations[0]
             self.assertEqual(loaded_segmentation.name,
                              segmentation.name)
-            np.testing.assert_array_almost_equal(loaded_segmentation.labels,
-                                                 segmentation.labels)
+            np.testing.assert_array_almost_equal(loaded_segmentation.keys,
+                                                 segmentation.keys)
 
     def test_segmentation_save_load(self):
         """Test saving a loading segmentations."""
@@ -137,5 +137,5 @@ class TestGifTI(unittest.TestCase):
             loaded = nimesh.io.gifti.load_segmentation(filename)
 
             # The loaded data should match the saved data.
-            np.testing.assert_array_almost_equal(segmentation.labels,
-                                                 loaded.labels)
+            np.testing.assert_array_almost_equal(segmentation.keys,
+                                                 loaded.keys)

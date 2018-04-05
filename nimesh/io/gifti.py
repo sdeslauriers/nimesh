@@ -258,7 +258,7 @@ def add_segmentation_to_gii(segmentation: Segmentation,
     meta = nib.gifti.GiftiMetaData.from_dict({'name': segmentation.name})
 
     label_array = nib.gifti.GiftiDataArray(
-        segmentation.labels,
+        segmentation.keys,
         intent='NIFTI_INTENT_LABEL',
         datatype='NIFTI_TYPE_INT32',
         meta=meta)

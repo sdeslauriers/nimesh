@@ -49,6 +49,6 @@ class TestFreeSurfer(unittest.TestCase):
             nimesh.io.freesurfer.save_segmentation(filename, segmentation)
             loaded = nimesh.io.freesurfer.load_segmentation(filename)
 
-            np.testing.assert_array_almost_equal(segmentation.labels,
-                                                 loaded.labels)
+            np.testing.assert_array_almost_equal(segmentation.keys,
+                                                 loaded.keys)
             self.assertEqual(segmentation.name, loaded.name)
