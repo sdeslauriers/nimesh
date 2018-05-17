@@ -4,7 +4,7 @@ import warnings
 import nibabel.freesurfer as nibfs
 import numpy as np
 
-from nimesh import CoordinateSystem, Mesh, Segmentation
+from nimesh import CoordinateSystem, Label, Mesh, Segmentation
 
 
 def load(surface: str, annotation: str = None) -> Mesh:
@@ -53,9 +53,17 @@ def load_segmentation(filename: str) -> Segmentation:
 
     """
 
-    labels, ctab, names = nibfs.read_annot(filename, True)
+    keys, ctab, names = nibfs.read_annot(filename)
+    segmentation = Segmentation(os.path.basename(filename), keys)
 
-    return Segmentation(os.path.basename(filename), labels)
+    def rgbt2rgba(color):
+        return color[0], color[1], color[2], 255
+
+    # Add the label names.
+    for i, (color, name) in enumerate(zip(ctab, names)):
+        segmentation.add_label(i, Label(name.decode(), rgbt2rgba(color[:4])))
+
+    return segmentation
 
 
 def save(filename: str, mesh: Mesh):
@@ -91,15 +99,51 @@ def save(filename: str, mesh: Mesh):
 def save_segmentation(filename: str, segmentation: Segmentation):
     """Saves a segmentation to a FreeSurfer annot file.
 
+    Saves a segmentation to a FreeSurfer annotation file. To be saved
+    correctly, each label needs to have a distinct color. The current
+    implementation relies on nibabel and does not save/load alpha values
+    correctly.
+
     Args:
         filename: The name of the annotation file where the segmentation will
             be saved.
         segmentation: The segmentation to save.
 
+    Raises:
+        ValueError if the segmentation has labels with duplicate colors.
+            This is a limitation imposed by the FreeSurfer annotation format.
+
     """
 
+    # nibabel does not appear to save the alpha value and always returns
+    # 255. Warn the user that alpha values will be lost if they are not all
+    # 255.
+    alphas = {label.color[-1] for _, label in segmentation.labels}
+    if np.any(alphas != 255):
+        warnings.warn('Alpha values for labels currently cannot be saved in '
+                      'the FreeSurfer annotation file format. They will be '
+                      'lost.',
+                      RuntimeWarning)
+
+    # To save a segmentation to a FreeSurfer annotation file, all labels must
+    # have a distinct color.
+    colors = {label.color for _, label in segmentation.labels}
+    if len(colors) != len(segmentation.labels):
+        raise ValueError('To save a segmentation to a FreeSurfer annotation '
+                         'file, all labels must have a distinct color.')
+
+    def color2annot(color):
+        return color[0] + \
+               color[1] * 256 + \
+               color[2] * 256 ** 2 + \
+               (255 - color[3]) * 256 ** 3
+
+    def rgba2rgbt(color):
+        """Change alpha to transparency in color"""
+        return color[0], color[1], color[2], 255 - color[3]
+
     keys = segmentation.keys
-    ctab = np.array([(i, 0, 0, 0, i) for i in np.unique(keys)],
-                    dtype=np.int16)
-    names = [str(i) for i in np.unique(keys)]
+    ctab = np.array([(*rgba2rgbt(label.color), color2annot(label.color))
+                     for key, label in segmentation.labels])
+    names = [label.name for _, label in segmentation.labels]
     nibfs.write_annot(filename, keys, ctab, names)

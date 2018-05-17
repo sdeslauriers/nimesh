@@ -73,6 +73,29 @@ class CoordinateSystem(IntEnum):
     LPS = 3
 
 
+class Label(Named):
+
+    def __init__(self, name: str, color: Sequence[int] = (0, 0, 0, 0)):
+        """One label of a segmentation.
+
+        The Label class represents the data of one label of a segmentation.
+        Within a segmentation, each label and each vertex are assigned a
+        key creating a mapping between vertices and label data.
+
+        Args:
+            name: The name of the label, for example: left superior frontal.
+        """
+
+        super().__init__(name)
+
+        self._color = tuple(color)
+
+    @property
+    def color(self):
+        """Returns the color of the label."""
+        return self._color
+
+
 class Mesh(object):
 
     def __init__(self, vertices: Sequence, triangles: Sequence,
@@ -336,8 +359,29 @@ class Segmentation(Named):
                              .format(keys.shape))
 
         self._keys = keys
+        self._labels = {}
 
     @property
     def keys(self) -> np.array:
         """Returns the key of each vertex of the segmentation."""
         return self._keys.copy()
+
+    @property
+    def labels(self) -> dict:
+        """Returns a dict of labels."""
+        return self._labels.items()
+
+    def add_label(self, key: int, label: Label):
+        """Adds a label to the segmentation.
+
+        Adds a label to the segmentation by associating it with a key.
+        Because each vertex is also assigned a key, this creates a mapping
+        between vertices and labels.
+
+        Args:
+            key: The key of the label.
+            label: The label data of the label.
+
+        """
+
+        self._labels[key] = label
