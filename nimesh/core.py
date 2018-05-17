@@ -369,7 +369,7 @@ class Segmentation(Named):
     @property
     def labels(self) -> dict:
         """Returns a dict of labels."""
-        return self._labels.items()
+        return self._labels.copy()
 
     def add_label(self, key: int, label: Label):
         """Adds a label to the segmentation.

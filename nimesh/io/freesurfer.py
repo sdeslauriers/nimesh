@@ -118,7 +118,7 @@ def save_segmentation(filename: str, segmentation: Segmentation):
     # nibabel does not appear to save the alpha value and always returns
     # 255. Warn the user that alpha values will be lost if they are not all
     # 255.
-    alphas = {label.color[-1] for _, label in segmentation.labels}
+    alphas = {label.color[-1] for label in segmentation.labels.values()}
     if np.any(alphas != 255):
         warnings.warn('Alpha values for labels currently cannot be saved in '
                       'the FreeSurfer annotation file format. They will be '
@@ -127,7 +127,7 @@ def save_segmentation(filename: str, segmentation: Segmentation):
 
     # To save a segmentation to a FreeSurfer annotation file, all labels must
     # have a distinct color.
-    colors = {label.color for _, label in segmentation.labels}
+    colors = {label.color for label in segmentation.labels.values()}
     if len(colors) != len(segmentation.labels):
         raise ValueError('To save a segmentation to a FreeSurfer annotation '
                          'file, all labels must have a distinct color.')
@@ -144,6 +144,6 @@ def save_segmentation(filename: str, segmentation: Segmentation):
 
     keys = segmentation.keys
     ctab = np.array([(*rgba2rgbt(label.color), color2annot(label.color))
-                     for key, label in segmentation.labels])
-    names = [label.name for _, label in segmentation.labels]
+                     for key, label in segmentation.labels.items()])
+    names = [label.name for label in segmentation.labels.values()]
     nibfs.write_annot(filename, keys, ctab, names)

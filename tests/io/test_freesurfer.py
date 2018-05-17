@@ -57,7 +57,8 @@ class TestFreeSurfer(unittest.TestCase):
             self.assertEqual(segmentation.name, loaded.name)
 
             # The labels should also match.
-            for (k1, l1), (k2, l2) in zip(segmentation.labels, loaded.labels):
+            items = zip(segmentation.labels.items(), loaded.labels.items())
+            for (k1, l1), (k2, l2) in items:
                 self.assertEqual(k1, k2)
                 self.assertEqual(l1.color, l2.color)
 
