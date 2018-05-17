@@ -7,7 +7,19 @@ import vtk
 import nimesh
 
 
-def view_mesh(mesh: nimesh.Mesh):
+def view(filename, freesurfer=None, segmentation=None):
+    """View a mesh from file or freesurfer directory."""
+
+    # Create the mesh and display it.
+    if freesurfer:
+        mesh = nimesh.from_freesurfer(filename, *freesurfer)
+    else:
+        mesh = nimesh.io.load(filename)
+
+    view_mesh(mesh, segmentation)
+
+
+def view_mesh(mesh: nimesh.Mesh, segmentation: str = None):
     """Displays a mesh in an interactive window.
 
     Displays a mesh in an interactive window. This function is intended to be
@@ -15,6 +27,7 @@ def view_mesh(mesh: nimesh.Mesh):
 
     Args:
         mesh: The mesh to view.
+        segmentation: The segmentation to use for colors.
 
     """
 
@@ -46,15 +59,35 @@ def view_mesh(mesh: nimesh.Mesh):
         triangles.InsertNextCell(vtk_triangle)
 
     # Create the poly data, mapper, and actor.
-    poly_data = vtk.vtkPolyData()
-    poly_data.SetPoints(points)
-    poly_data.SetPolys(triangles)
+    polydata = vtk.vtkPolyData()
+    polydata.SetPoints(points)
+    polydata.SetPolys(triangles)
+
+    # Use the color from the segmentation if it was provided.
+    if segmentation is not None:
+        segmentation = next(s for s in mesh.segmentations if s.name ==
+                            segmentation)
+        colors = vtk.vtkUnsignedCharArray()
+        colors.SetNumberOfComponents(3)
+        colors.SetName('colors')
+        for key in segmentation.keys:
+            if key == -1:
+                color = (0, 0, 0)
+            else:
+                color = segmentation._labels[key].color[:3]
+
+            colors.InsertNextTuple3(*color)
+
+        polydata.GetPointData().SetScalars(colors)
 
     mapper = vtk.vtkPolyDataMapper()
-    mapper.SetInputData(poly_data)
+    mapper.SetInputData(polydata)
 
     actor = vtk.vtkActor()
     actor.SetMapper(mapper)
+    actor.GetProperty().SetSpecular(0.0)
+    actor.GetProperty().SetDiffuse(0.5)
+    actor.GetProperty().SetAmbient(0.5)
 
     # Add the actor to the renderer.
     renderer.AddActor(actor)
@@ -72,11 +105,26 @@ if __name__ == '__main__':
 
     # Create the argument parser.
     parser = argparse.ArgumentParser()
-    parser.add_argument('filename')
+    subparsers = parser.add_subparsers()
+
+    # The view subparser.
+    view_parser = subparsers.add_parser('view')
+    view_parser.add_argument(
+        'filename', metavar='FILENAME',
+        help='STR The file that contains the mesh to display. In the case of '
+             'a FreeSurfer mesh, can also be a directory (see the '
+             '--freesurfer option).')
+    view_parser.add_argument(
+        '--freesurfer', metavar=('HEMISPHERE', 'SURFACE'), nargs=2,
+        help='STR STR Specifies the hemisphere (lh or rh) and the surface '
+             'type (pial, white, or inflated) to view. Only useful if the '
+             'filename is a FreeSurfer directory.')
+    view_parser.add_argument(
+        '--segmentation', metavar='NAME',
+        help='STR The name of the segmentation used to color the surface.')
+    view_parser.set_defaults(func=view)
 
     args = parser.parse_args()
-
-    # Create the mesh and display it.
-    mesh = nimesh.io.load(args.filename)
-
-    view_mesh(mesh)
+    parameters = {key: value for key, value in vars(args).items()
+                  if key != 'func'}
+    args.func(**parameters)
