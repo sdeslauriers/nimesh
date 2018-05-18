@@ -65,8 +65,7 @@ def view_mesh(mesh: nimesh.Mesh, segmentation: str = None):
 
     # Use the color from the segmentation if it was provided.
     if segmentation is not None:
-        segmentation = next(s for s in mesh.segmentations if s.name ==
-                            segmentation)
+        segmentation = mesh.segmentations[segmentation]
         colors = vtk.vtkUnsignedCharArray()
         colors.SetNumberOfComponents(3)
         colors.SetName('colors')

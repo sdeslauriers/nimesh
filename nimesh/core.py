@@ -2,7 +2,7 @@ import numpy as np
 from enum import IntEnum
 from typing import List, Sequence
 
-from .mixins import Named
+from .mixins import Named, ListOfNamed
 
 
 class AffineTransform(object):
@@ -171,7 +171,7 @@ class Mesh(object):
         self._coordinate_system = coordinate_system
 
         self._transforms = []
-        self._segmentations = []
+        self._segmentations = ListOfNamed()
 
     def __repr__(self) -> str:
         return 'Mesh: {} vertices, {} triangles'.format(self.nb_vertices,
@@ -193,7 +193,7 @@ class Mesh(object):
         return len(self._vertices)
 
     @property
-    def segmentations(self) -> List['Segmentation']:
+    def segmentations(self) -> ListOfNamed:
         """Returns the segmentations of the mesh."""
         return self._segmentations.copy()
 
