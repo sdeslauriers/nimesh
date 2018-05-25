@@ -65,8 +65,21 @@ def load(filename: str) -> Mesh:
 
     triangles = triangle_arrays[0].data
 
+    # Get the normals array if it exists.
+    normals_arrays = gii.get_arrays_from_intent('NIFTI_INTENT_VECTOR')
+    if len(normals_arrays) > 0:
+        if len(normals_arrays) != 1:
+            warnings.warn('The file {} contains more than one vector array. '
+                          'The first one was interpreted as mesh normals. '
+                          'Proceed with caution.'.format(filename))
+
+        normals = normals_arrays[0].data
+
+    else:
+        normals = None
+
     # Create the mesh.
-    mesh = Mesh(vertices, triangles, coordinate_system)
+    mesh = Mesh(vertices, triangles, coordinate_system, normals)
 
     # Add the transform if one was saved.
     if gifti_transform.dataspace != gifti_transform.xformspace:
@@ -196,6 +209,14 @@ def save(filename: str, mesh: Mesh,
         intent='NIFTI_INTENT_TRIANGLE',
         datatype='NIFTI_TYPE_INT32')
     gii.add_gifti_data_array(triangles_array)
+
+    # Save the normals if they exist.
+    if mesh.normals is not None:
+        normals_array = nib.gifti.GiftiDataArray(
+            mesh.normals.astype('f4'),
+            intent='NIFTI_INTENT_VECTOR',
+            datatype='NIFTI_TYPE_FLOAT32')
+        gii.add_gifti_data_array(normals_array)
 
     nib.save(gii, filename)
 

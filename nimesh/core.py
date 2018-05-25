@@ -1,6 +1,6 @@
 import numpy as np
 from enum import IntEnum
-from typing import List, Sequence
+from typing import List, Sequence, Union
 
 from .mixins import Named, ListOfNamed
 
@@ -99,7 +99,8 @@ class Label(Named):
 class Mesh(object):
 
     def __init__(self, vertices: Sequence, triangles: Sequence,
-                 coordinate_system: CoordinateSystem = CoordinateSystem.VOXEL):
+                 coordinate_system: CoordinateSystem = CoordinateSystem.VOXEL,
+                 normals: Sequence = None):
         """Triangle mesh of the cortical surface.
 
         The Mesh class represents a polygon mesh of the cortical surface
@@ -114,6 +115,9 @@ class Mesh(object):
                 (M, 3) where M is the number of triangles.
             coordinate_system (optional): The coordinate system of the
                 vertices (see CoordinateSystem). Defaults to VOXEL.
+            normals (optional): The normals of the vertices. Must be a sequence
+                that can be converted to a numpy array of floats with a
+                shape of (N, 3) where N is the number of vertices.
 
         Raises:
             TypeError: If vertices or triangles cannot be converted to numpy
@@ -173,6 +177,9 @@ class Mesh(object):
         self._transforms = []
         self._segmentations = ListOfNamed()
 
+        self._normals = None
+        self.normals = normals
+
     def __repr__(self) -> str:
         return 'Mesh: {} vertices, {} triangles'.format(self.nb_vertices,
                                                         self.nb_triangles)
@@ -191,6 +198,41 @@ class Mesh(object):
     def nb_vertices(self) -> int:
         """Returns the number of vertices of the mesh."""
         return len(self._vertices)
+
+    @property
+    def normals(self) -> Union[np.ndarray, None]:
+        """Returns the normals of the mesh or None."""
+
+        if self._normals is None:
+            return None
+
+        return self._normals.copy()
+
+    @normals.setter
+    def normals(self, normals: Sequence):
+        """Sets the normals of the mesh."""
+
+        if normals is None:
+            self._normals = None
+            return
+
+        try:
+            normals = np.array(normals, dtype=np.float64)
+        except Exception:
+            raise TypeError('\'normals\' must be convertible to a numpy '
+                            'array of floats.')
+
+        if normals.ndim != 2 or normals.shape[1] != 3:
+            raise ValueError('\'normals\' must have a shape of (N, 3) not '
+                             '{}.'.format(normals.shape))
+
+        # The number of normals must match the number of vertices.
+        if len(normals) != self.nb_vertices:
+            raise ValueError('The number of normals must match the '
+                             'number of vertices ({} != {}).'
+                             .format(len(normals), self.nb_vertices))
+
+        self._normals = normals
 
     @property
     def segmentations(self) -> ListOfNamed:
