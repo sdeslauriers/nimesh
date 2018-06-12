@@ -525,7 +525,10 @@ class VertexData(Named):
             raise TypeError('\'data\' must be convertible to a numpy '
                             'array of floats.')
 
-        if data.ndim != 2:
+        if data.ndim == 1:
+            data = data[:, None]
+
+        elif data.ndim != 2:
             raise ValueError('\'data\' must have two dimensions, not {}.'
                              .format(data.ndim))
 
