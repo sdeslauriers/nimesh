@@ -180,6 +180,8 @@ class Mesh(object):
         self._normals = None
         self.normals = normals
 
+        self._vertex_data = ListOfNamed()
+
     def __repr__(self) -> str:
         return 'Mesh: {} vertices, {} triangles'.format(self.nb_vertices,
                                                         self.nb_triangles)
@@ -250,6 +252,11 @@ class Mesh(object):
         return self._triangles.copy()
 
     @property
+    def vertex_data(self) -> Sequence['VertexData']:
+        """Returns the vertex data of the mesh"""
+        return self._vertex_data.copy()
+
+    @property
     def vertices(self) -> np.array:
         """Returns a copy of the mesh's vertices."""
         return self._vertices.copy()
@@ -312,6 +319,39 @@ class Mesh(object):
                              .format(transform.transform_coord_sys))
 
         self._transforms.append(transform)
+
+    def add_vertex_data(self, vertex_data: 'VertexData'):
+        """Adds vertex data to the mesh
+
+        Args:
+            vertex_data: The vertex data to add. The name of this data must
+                be distinct from the data already associated with the mesh. The
+                length of the data must also match the number of vertices of
+                the mesh.
+
+        Raises:
+            TypeError if vertex_data is not an instance of VertexData.
+            ValueError if the mesh already has vertex data with the same name.
+            ValueError if the length of the data does not match the number
+                of vertices of the mesh.
+
+        """
+
+        if not isinstance(vertex_data, VertexData):
+            raise TypeError('\'vertex_data\' must be an instance of '
+                            'VertexData, not {}.'.format(type(vertex_data)))
+
+        if vertex_data.name in [vd.name for vd in self._vertex_data]:
+            raise ValueError('The mesh already contains vertex data with the '
+                             'name {}.'.format(vertex_data.name))
+
+        if vertex_data.nb_vertices != self.nb_vertices:
+            raise ValueError('The number of vertices of the mesh does not '
+                             'match the number of vertices of the data '
+                             '({} != {}).'.format(vertex_data.nb_vertices,
+                                                  self.nb_vertices))
+
+        self._vertex_data.append(vertex_data)
 
     def transform_to(self, coordinate_system: CoordinateSystem):
         """Transforms the mesh to a another coordinate system.
@@ -427,3 +467,76 @@ class Segmentation(Named):
         """
 
         self._labels[key] = label
+
+
+class VertexData(Named):
+    def __init__(self, name: str, data: Sequence):
+        """Vertex data of a mesh
+
+        The vertex data class represents arbitrary data about the vertices
+        of a mesh. The data must be convertible to an array of float with a
+        shape of (N, M) where N is the number of vertices of the mesh.
+
+        Args:
+            name: The name of the vertex data.
+            data: The data of each vertex.
+
+        Raises:
+            TypeError if the data cannot be converted to a numpy array of
+                floats.
+            ValueError if the data array does not have a shape of (N, M).
+
+        """
+
+        super().__init__(name)
+
+        self._data = None
+        self.data = data
+
+    @property
+    def data(self) -> np.ndarray:
+        """Returns the data for each vertex"""
+        return self._data
+
+    @data.setter
+    def data(self, data: Sequence):
+        """Sets the data for each vertex
+
+        Modifies the data associated with each vertex. The length of the
+        data must match the length of the previous data to prevent changing
+        the number of vertices.
+
+        Args:
+            data: The data of each vertex. Must be a Sequence convertible to a
+                numpy array of floats.
+
+        Raises:
+            TypeError if the data cannot be converted to a numpy array of
+                floats.
+            ValueError if the data array does not have a shape of (N, M).
+            ValueError if the length of the data does not match the length
+                of the previous data.
+
+        """
+
+        try:
+            data = np.array(data, dtype=np.float64)
+        except Exception:
+            raise TypeError('\'data\' must be convertible to a numpy '
+                            'array of floats.')
+
+        if data.ndim != 2:
+            raise ValueError('\'data\' must have two dimensions, not {}.'
+                             .format(data.ndim))
+
+        if self.data is not None and len(data) != self.nb_vertices:
+            raise ValueError('The length of \'data\' does not match the '
+                             'number of vertices of the previous data '
+                             '({} != {}).'.format(len(data), self.nb_vertices))
+
+        self._data = data
+
+    @property
+    def nb_vertices(self):
+        """Returns the number of vertices associated with the data"""
+        return len(self.data)
