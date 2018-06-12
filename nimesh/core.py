@@ -252,7 +252,7 @@ class Mesh(object):
         return self._triangles.copy()
 
     @property
-    def vertex_data(self) -> Sequence['VertexData']:
+    def vertex_data(self) -> ListOfNamed:
         """Returns the vertex data of the mesh"""
         return self._vertex_data.copy()
 

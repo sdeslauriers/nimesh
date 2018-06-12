@@ -16,7 +16,7 @@ class Named(object):
 class ListOfNamed(list):
     """Represents a list of items that have names."""
 
-    def __getitem__(self, item) -> Union[Named, None]:
+    def __getitem__(self, item: Union[str, int, slice]) -> Union[Named, None]:
         """Allows getting items by their name"""
 
         if isinstance(item, str):
