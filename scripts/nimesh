@@ -7,7 +7,33 @@ import vtk
 import nimesh
 
 
-def view(filename, freesurfer=None, segmentation=None):
+def print_info(filename, freesurfer=None):
+    """Prints the information of a mesh"""
+
+    # Create the mesh.
+    if freesurfer:
+        mesh = nimesh.from_freesurfer(filename, *freesurfer)
+    else:
+        mesh = nimesh.io.load(filename)
+
+    print('Mesh: {}'.format(filename))
+    print('Number of vertices: {}'.format(mesh.nb_vertices))
+    print('Number of triangles: {}'.format(mesh.nb_triangles))
+
+    print('Segmentations:')
+    if len(mesh.segmentations) == 0:
+        print('  None')
+    for segmentation in mesh.segmentations:
+        print('  {}'.format(segmentation.name))
+
+    print('Vertex data:')
+    if len(mesh.vertex_data) == 0:
+        print('  None')
+    for vertex_data in mesh.vertex_data:
+        print('  {}'.format(vertex_data.name))
+
+
+def view(filename, freesurfer=None, segmentation=None, vertex_data=None):
     """View a mesh from file or freesurfer directory."""
 
     # Create the mesh and display it.
@@ -16,10 +42,11 @@ def view(filename, freesurfer=None, segmentation=None):
     else:
         mesh = nimesh.io.load(filename)
 
-    view_mesh(mesh, segmentation)
+    view_mesh(mesh, segmentation, vertex_data)
 
 
-def view_mesh(mesh: nimesh.Mesh, segmentation: str = None):
+def view_mesh(mesh: nimesh.Mesh,
+              segmentation: str = None, vertex_data: str = None):
     """Displays a mesh in an interactive window.
 
     Displays a mesh in an interactive window. This function is intended to be
@@ -27,7 +54,9 @@ def view_mesh(mesh: nimesh.Mesh, segmentation: str = None):
 
     Args:
         mesh: The mesh to view.
-        segmentation: The segmentation to use for colors.
+        segmentation: The segmentation to use for colors (ignored if
+            vertex_data is not None).
+        vertex_data: The vertex data to use for colors.
 
     """
 
@@ -79,13 +108,26 @@ def view_mesh(mesh: nimesh.Mesh, segmentation: str = None):
 
         polydata.GetPointData().SetScalars(colors)
 
+    # Use the vertex data for color if it was provided.
+    if vertex_data is not None:
+        vertex_data = mesh.vertex_data[vertex_data]
+        colors = vtk.vtkUnsignedCharArray()
+        colors.SetNumberOfComponents(3)
+        colors.SetName('colors')
+        data = vertex_data.data / vertex_data.data.max() * 255
+        for datum in data:
+            color = (0, datum, 0)
+            colors.InsertNextTuple3(*color)
+
+        polydata.GetPointData().SetScalars(colors)
+
     mapper = vtk.vtkPolyDataMapper()
     mapper.SetInputData(polydata)
 
     actor = vtk.vtkActor()
     actor.SetMapper(mapper)
-    actor.GetProperty().SetSpecular(0.0)
-    actor.GetProperty().SetDiffuse(0.5)
+    actor.GetProperty().SetSpecular(0.2)
+    actor.GetProperty().SetDiffuse(1.0)
     actor.GetProperty().SetAmbient(0.5)
 
     # Add the actor to the renderer.
@@ -108,6 +150,8 @@ if __name__ == '__main__':
 
     # The view subparser.
     view_parser = subparsers.add_parser('view')
+    view_parser.set_defaults(func=view)
+
     view_parser.add_argument(
         'filename', metavar='FILENAME',
         help='STR The file that contains the mesh to display. In the case of '
@@ -118,10 +162,31 @@ if __name__ == '__main__':
         help='STR STR Specifies the hemisphere (lh or rh) and the surface '
              'type (pial, white, or inflated) to view. Only useful if the '
              'filename is a FreeSurfer directory.')
-    view_parser.add_argument(
+
+    # Indicates what is used to color the mesh.
+    color_group = view_parser.add_mutually_exclusive_group()
+    color_group.add_argument(
         '--segmentation', metavar='NAME',
         help='STR The name of the segmentation used to color the surface.')
-    view_parser.set_defaults(func=view)
+    color_group.add_argument(
+        '--vertex-data', metavar='NAME',
+        help='STR the name of the vertex data used to color the surface.'
+    )
+
+    # The info subparser.
+    info_parser = subparsers.add_parser('info')
+    info_parser.set_defaults(func=print_info)
+
+    info_parser.add_argument(
+        'filename', metavar='FILENAME',
+        help='STR The file that contains the mesh to display. In the case of '
+             'a FreeSurfer mesh, can also be a directory (see the '
+             '--freesurfer option).')
+    info_parser.add_argument(
+        '--freesurfer', metavar=('HEMISPHERE', 'SURFACE'), nargs=2,
+        help='STR STR Specifies the hemisphere (lh or rh) and the surface '
+             'type (pial, white, or inflated) to view. Only useful if the '
+             'filename is a FreeSurfer directory.')
 
     args = parser.parse_args()
     parameters = {key: value for key, value in vars(args).items()
