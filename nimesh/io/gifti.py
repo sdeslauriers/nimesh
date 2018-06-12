@@ -3,6 +3,7 @@ import warnings
 import nibabel as nib
 
 from nimesh import AffineTransform, CoordinateSystem, Mesh, Segmentation
+from nimesh.core import VertexData
 
 
 def load(filename: str) -> Mesh:
@@ -92,6 +93,19 @@ def load(filename: str) -> Mesh:
     segmentation = _create_segmentation_from_gii(gii)
     if segmentation is not None:
         mesh.add_segmentation(segmentation)
+
+    # Add the vertex data if any was saved.
+    vertex_data_arrays = gii.get_arrays_from_intent('NIFTI_INTENT_ESTIMATE')
+    for vertex_data_array in vertex_data_arrays:
+
+        if 'name' not in vertex_data_array.meta.metadata:
+            warnings.warn('The file {} contains a vertex data array without '
+                          'a name. It was ignored.'.format(filename))
+            continue
+
+        vertex_data = VertexData(vertex_data_array.meta.metadata['name'],
+                                 vertex_data_array.data)
+        mesh.add_vertex_data(vertex_data)
 
     return mesh
 
@@ -217,6 +231,16 @@ def save(filename: str, mesh: Mesh,
             intent='NIFTI_INTENT_VECTOR',
             datatype='NIFTI_TYPE_FLOAT32')
         gii.add_gifti_data_array(normals_array)
+
+    # Save the vertex data if there is any.
+    for vertex_data in mesh.vertex_data:
+
+        vertex_data_array = nib.gifti.GiftiDataArray(
+            vertex_data.data.astype('f4'),
+            intent='NIFTI_INTENT_ESTIMATE',
+            datatype='NIFTI_TYPE_FLOAT32',
+            meta={'name': vertex_data.name})
+        gii.add_gifti_data_array(vertex_data_array)
 
     nib.save(gii, filename)
 

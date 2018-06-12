@@ -6,6 +6,7 @@ import numpy as np
 
 import nimesh.io
 from nimesh import AffineTransform, CoordinateSystem, Mesh, Segmentation
+from nimesh.core import VertexData
 
 
 def minimal_mesh():
@@ -139,3 +140,30 @@ class TestGifTI(unittest.TestCase):
             # The loaded data should match the saved data.
             np.testing.assert_array_almost_equal(segmentation.keys,
                                                  loaded.keys)
+
+    def test_vertex_data_save_load(self):
+        """Test saving and loading vertex data"""
+
+        mesh = minimal_mesh()
+
+        # Add some vertex data.
+        vertex_data_a = VertexData('a', np.random.randn(mesh.nb_vertices, 2))
+        mesh.add_vertex_data(vertex_data_a)
+        vertex_data_b = VertexData('b', np.random.randn(mesh.nb_vertices, 2))
+        mesh.add_vertex_data(vertex_data_b)
+
+        # Work in a temporary directory. This guarantees cleanup even on error.
+        with tempfile.TemporaryDirectory() as directory:
+
+            # Save the mesh and reload it.
+            filename = os.path.join(directory, 'data.gii')
+            nimesh.io.gifti.save(filename, mesh)
+            loaded = nimesh.io.gifti.load(filename)
+
+            # The loaded data should match the saved data.
+            np.testing.assert_array_almost_equal(
+                loaded.vertex_data['a'].data,
+                vertex_data_a.data)
+            np.testing.assert_array_almost_equal(
+                loaded.vertex_data['b'].data,
+                vertex_data_b.data)
