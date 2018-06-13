@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='nimesh',
     version='0.0.0',
-    packages=['nimesh'],
+    packages=['nimesh', 'nimesh.io'],
     url='https://github.com/sdeslauriers/nimesh.git',
     license='MIT',
     author='Samuel Deslauriers-Gauthier',
