@@ -28,8 +28,7 @@ def load(surface: str, annotation: str = None) -> Mesh:
     if 'cras' in meta:
         vertices += meta['cras']
 
-    # We supposed the FreeSurfer surface is in RAS.
-    mesh = Mesh(vertices, triangles, CoordinateSystem.RAS)
+    mesh = Mesh(vertices, triangles)
 
     # Load the annotations, if requested.
     if annotation is not None:

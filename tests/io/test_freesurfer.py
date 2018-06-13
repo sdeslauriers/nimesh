@@ -34,7 +34,8 @@ class TestFreeSurfer(unittest.TestCase):
             # Verify the general shape of the mesh.
             self.assertEqual(mesh.nb_vertices, loaded.nb_vertices)
             self.assertEqual(mesh.nb_triangles, loaded.nb_triangles)
-            self.assertEqual(mesh.coordinate_system, loaded.coordinate_system)
+            self.assertEqual(loaded.coordinate_system,
+                             CoordinateSystem.UNKNOWN)
 
     def test_segmentation_save_load(self):
         """Test saving and loading a segmentation."""

@@ -115,7 +115,7 @@ class TestMesh(unittest.TestCase):
             [1, 2, 3],
         ]
 
-        mesh = Mesh(vertices, triangles)
+        mesh = Mesh(vertices, triangles, CoordinateSystem.VOXEL)
 
         # Add a transform to scanner space.
         affine = [

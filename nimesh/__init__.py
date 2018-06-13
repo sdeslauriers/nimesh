@@ -1,5 +1,8 @@
 import os
+import warnings
 
+import nibabel as nib
+import numpy as np
 from nimesh.core import AffineTransform, CoordinateSystem, Mesh
 from nimesh.core import Label, Segmentation
 from nimesh import io
@@ -34,6 +37,27 @@ def from_freesurfer(subject_directory: str,
     surface_file = os.path.join(subject_directory, 'surf',
                                 hemisphere + '.' + surface)
     mesh = io.freesurfer.load(surface_file)
+
+    # Get the coordinate system information from the MRI image.
+    nii = nib.load(os.path.join(subject_directory, 'mri', 'rawavg.mgz'))
+    codes = nib.aff2axcodes(nii.affine)
+
+    if codes == ('L', 'P', 'S'):
+        coordinate_system = CoordinateSystem.LPS
+    elif codes == ('R', 'A', 'S'):
+        coordinate_system = CoordinateSystem.RAS
+    else:
+        coordinate_system = CoordinateSystem.UNKNOWN
+        warnings.warn('The coordinate system could not be identified from '
+                      'the MRI (rawavg.mgz). The transform will not be set.')
+
+    mesh.coordinate_system = coordinate_system
+
+    # Add the transform to voxel space if the coordinate system is known.
+    if coordinate_system != CoordinateSystem.UNKNOWN:
+        transform = AffineTransform(CoordinateSystem.VOXEL,
+                                    np.linalg.inv(nii.affine))
+        mesh.add_transform(transform)
 
     # Load the annotations.
     desikan_file = os.path.join(subject_directory, 'label',

@@ -101,9 +101,10 @@ class Label(Named):
 
 class Mesh(object):
 
-    def __init__(self, vertices: Sequence, triangles: Sequence,
-                 coordinate_system: CoordinateSystem = CoordinateSystem.VOXEL,
-                 normals: Sequence = None):
+    def __init__(
+            self, vertices: Sequence, triangles: Sequence,
+            coordinate_system: CoordinateSystem = CoordinateSystem.UNKNOWN,
+            normals: Sequence = None):
         """Triangle mesh of the cortical surface.
 
         The Mesh class represents a polygon mesh of the cortical surface
