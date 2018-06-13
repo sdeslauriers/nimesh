@@ -385,13 +385,13 @@ def _get_transform_from_vertex_array(vertex_array)\
 
     # If the metadata of the vertex array contains the key 'tcs',
     # use it to create the transform. If is doesn't, only add the
-    # transform if the xform and xformspace are not both unknown.
+    # transform if the dataspace and xformspace are not identical.
     if 'tcs' in vertex_array.metadata:
         transform = AffineTransform(
             CoordinateSystem(int(vertex_array.metadata['tcs'])),
             gifti_transform.xform)
 
-    elif gifti_transform.dataspace != 0 or gifti_transform.xformspace != 0:
+    elif gifti_transform.dataspace != gifti_transform.xformspace:
         transform = AffineTransform(
             _convert_nifti_code_to_coord_sys(gifti_transform.xformspace),
             gifti_transform.xform)
