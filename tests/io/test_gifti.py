@@ -4,6 +4,7 @@ import unittest
 
 import numpy as np
 
+import nibabel as nib
 import nimesh.io
 from nimesh import AffineTransform, CoordinateSystem, Mesh, Segmentation
 from nimesh.core import VertexData
@@ -30,6 +31,95 @@ def minimal_mesh():
 
 class TestGifTI(unittest.TestCase):
     """Test the nimesh.io.gifti module."""
+
+    def test_coordinate_system_save_load(self):
+        """Test saving and loading the transform coordinate system"""
+
+        mesh = minimal_mesh()
+
+        # Work in a temporary directory. This guarantees cleanup even on error.
+        with tempfile.TemporaryDirectory() as directory:
+
+            mesh.coordinate_system = CoordinateSystem.VOXEL
+            mesh.add_transform(AffineTransform(CoordinateSystem.RAS,
+                                               np.eye(4)))
+
+            filename = os.path.join(directory, 'mesh.gii')
+            nimesh.io.save(filename, mesh)
+            loaded = nimesh.io.load(filename)
+
+            self.assertEqual(mesh.coordinate_system, loaded.coordinate_system)
+            self.assertTrue(len(loaded.transforms) == 1)
+            self.assertEqual(mesh.transforms[0].transform_coord_sys,
+                             loaded.transforms[0].transform_coord_sys)
+
+        # A mesh with no transforms should also be loaded correctly.
+        mesh = minimal_mesh()
+        with tempfile.TemporaryDirectory() as directory:
+
+            filename = os.path.join(directory, 'other-mesh.gii')
+            nimesh.io.save(filename, mesh)
+            loaded = nimesh.io.load(filename)
+
+            self.assertEqual(mesh.coordinate_system, loaded.coordinate_system)
+            self.assertTrue(len(loaded.transforms) == 0)
+
+        # Meshes without transforms and saved without nimesh should also load.
+        with tempfile.TemporaryDirectory() as directory:
+
+            gii = nib.gifti.GiftiImage()
+
+            vertices_array = nib.gifti.GiftiDataArray(
+                mesh.vertices.astype('f4'),
+                intent='NIFTI_INTENT_POINTSET',
+                datatype='NIFTI_TYPE_FLOAT32')
+            gii.add_gifti_data_array(vertices_array)
+
+            triangles_array = nib.gifti.GiftiDataArray(
+                mesh.triangles.astype('i4'),
+                intent='NIFTI_INTENT_TRIANGLE',
+                datatype='NIFTI_TYPE_INT32')
+            gii.add_gifti_data_array(triangles_array)
+
+            filename = os.path.join(directory, 'mesh.gii')
+            nib.save(gii, filename)
+            loaded = nimesh.io.load(filename)
+
+            self.assertEqual(loaded.coordinate_system,
+                             CoordinateSystem.UNKNOWN)
+
+        # Meshes with a transforms and saved without nimesh should also load.
+        with tempfile.TemporaryDirectory() as directory:
+
+            gii = nib.gifti.GiftiImage()
+
+            gifti_coord_sys = nib.gifti.GiftiCoordSystem(
+                'NIFTI_XFORM_SCANNER_ANAT',
+                'NIFTI_XFORM_MNI_152',
+                np.eye(4))
+            vertices_array = nib.gifti.GiftiDataArray(
+                mesh.vertices.astype('f4'),
+                intent='NIFTI_INTENT_POINTSET',
+                datatype='NIFTI_TYPE_FLOAT32',
+                coordsys=gifti_coord_sys)
+            gii.add_gifti_data_array(vertices_array)
+
+            triangles_array = nib.gifti.GiftiDataArray(
+                mesh.triangles.astype('i4'),
+                intent='NIFTI_INTENT_TRIANGLE',
+                datatype='NIFTI_TYPE_INT32')
+            gii.add_gifti_data_array(triangles_array)
+
+            filename = os.path.join(directory, 'mesh.gii')
+            nib.save(gii, filename)
+            loaded = nimesh.io.load(filename)
+
+            self.assertEqual(loaded.coordinate_system,
+                             CoordinateSystem.SCANNER)
+            self.assertTrue(len(loaded.transforms) == 1)
+            self.assertEqual(
+                loaded.transforms[0].transform_coord_sys,
+                CoordinateSystem.MNI)
 
     def test_minimal_save_load(self):
         """Test saving and loading with a minimal mesh."""

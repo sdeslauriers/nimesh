@@ -67,10 +67,13 @@ class AffineTransform(object):
 
 class CoordinateSystem(IntEnum):
     """The possible coordinate systems of meshes."""
-    SCANNER = 0
-    VOXEL = 1
+    UNKNOWN = 0
+    SCANNER = 1
     RAS = 2
     LPS = 3
+    VOXEL = 4
+    MNI = 5
+    TALAIRACH = 6
 
 
 class Label(Named):
@@ -190,6 +193,21 @@ class Mesh(object):
     def coordinate_system(self) -> CoordinateSystem:
         """Returns the coordinate system of the mesh."""
         return self._coordinate_system
+
+    @coordinate_system.setter
+    def coordinate_system(self, coordinate_system):
+        """Sets the coordinate system of the mesh"""
+
+        if len(self._transforms) != 0:
+            raise ValueError('The mesh contains transforms. The coordinate '
+                             'system cannot be changed.')
+
+        if not isinstance(coordinate_system, CoordinateSystem):
+            raise TypeError('The coordinate system must be an instance of '
+                            '{}, not {}.'
+                            .format(CoordinateSystem, type(coordinate_system)))
+
+        self._coordinate_system = coordinate_system
 
     @property
     def nb_triangles(self) -> int:

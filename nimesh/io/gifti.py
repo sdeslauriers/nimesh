@@ -1,4 +1,5 @@
 import warnings
+from typing import Union
 
 import nibabel as nib
 
@@ -46,9 +47,12 @@ def load(filename: str) -> Mesh:
     vertex_array = vertex_arrays[0]
     vertices = vertex_array.data
 
-    # Get the coordinate system from the transform
-    gifti_transform = vertex_array.coordsys
-    coordinate_system = CoordinateSystem(gifti_transform.dataspace)
+    # Get the coordinate system from the metadata.
+    if 'cs' in vertex_array.metadata:
+        coordinate_system = CoordinateSystem(int(vertex_array.metadata['cs']))
+    else:
+        coordinate_system = _convert_nifti_code_to_coord_sys(
+            vertex_array.coordsys.dataspace)
 
     # Get the triangles array. If there is more than one, warn the user and
     # use the first one.
@@ -83,10 +87,8 @@ def load(filename: str) -> Mesh:
     mesh = Mesh(vertices, triangles, coordinate_system, normals)
 
     # Add the transform if one was saved.
-    if gifti_transform.dataspace != gifti_transform.xformspace:
-        transform = AffineTransform(
-            CoordinateSystem(gifti_transform.xformspace),
-            gifti_transform.xform)
+    transform = _get_transform_from_vertex_array(vertex_array)
+    if transform is not None:
         mesh.add_transform(transform)
 
     # Add the segmentation if one was saved.
@@ -160,14 +162,6 @@ def save(filename: str, mesh: Mesh,
 
     gii = nib.gifti.GiftiImage()
 
-    # The coordinate system is saved in the metadata of the vertex array.
-    # The GifTI specifications indicate that multiple coordinate systems
-    # could be saved using GiftiCoordSystem, but the nibabel implementation
-    # does not seem to support that functionality.
-    meta = {
-        'cs': str(mesh.coordinate_system.value)
-    }
-
     # The GifTI file format only allows saving one segmentation. If the mesh
     # contains more that one, warn the user and save only the first one.
     segmentations = mesh.segmentations
@@ -179,6 +173,13 @@ def save(filename: str, mesh: Mesh,
     if len(segmentations) != 0:
         add_segmentation_to_gii(segmentations[0], gii)
 
+    # The coordinate system is saved in the metadata of the vertex array.
+    # Because it is possible to save the coordinate system of the points
+    # without having a transform, we add it to the metadata.
+    meta = {
+        'cs': str(mesh.coordinate_system.value)
+    }
+
     # For now, the GifTI implementation of nibabel seems to support only a
     # single transform. If the mesh has more than one, warn the user and
     # save the first one.
@@ -189,13 +190,14 @@ def save(filename: str, mesh: Mesh,
                       'be saved.')
 
     if len(transforms) != 0:
+        transform = transforms[0]
         coordinate_system = nib.gifti.GiftiCoordSystem(
-            mesh.coordinate_system.value,
-            transforms[0].transform_coord_sys.value,
-            transforms[0].affine)
+            _convert_coord_sys_to_nifti_code(mesh.coordinate_system),
+            _convert_coord_sys_to_nifti_code(transform.transform_coord_sys),
+            transform.affine)
+        meta['tcs'] = str(transform.transform_coord_sys.value)
     else:
-        coordinate_system = nib.gifti.GiftiCoordSystem(mesh.coordinate_system,
-                                                       mesh.coordinate_system)
+        coordinate_system = None
 
     vertices_array = nib.gifti.GiftiDataArray(
         mesh.vertices.astype('f4'),
@@ -311,6 +313,36 @@ def add_segmentation_to_gii(segmentation: Segmentation,
     gii.add_gifti_data_array(label_array)
 
 
+def _convert_coord_sys_to_nifti_code(coord_sys: CoordinateSystem) -> int:
+    """Converts coordinate systems to NIfTI xform codes"""
+
+    convert = {
+        CoordinateSystem.UNKNOWN: 0,
+        CoordinateSystem.SCANNER: 1,
+        CoordinateSystem.RAS: 2,
+        CoordinateSystem.LPS: 2,
+        CoordinateSystem.VOXEL: 0,
+        CoordinateSystem.MNI: 4,
+        CoordinateSystem.TALAIRACH: 3,
+    }
+
+    return convert[coord_sys]
+
+
+def _convert_nifti_code_to_coord_sys(code: int) -> CoordinateSystem:
+    """Converts a NIfTI xform code to a coordinate system"""
+
+    convert = {
+        0: CoordinateSystem.UNKNOWN,
+        1: CoordinateSystem.SCANNER,
+        2: CoordinateSystem.UNKNOWN,
+        3: CoordinateSystem.TALAIRACH,
+        4: CoordinateSystem.MNI,
+    }
+
+    return convert[code]
+
+
 def _create_segmentation_from_gii(gii) -> Segmentation:
     """Creates a segmentation from a nibabel GifTI object.
 
@@ -342,3 +374,29 @@ def _create_segmentation_from_gii(gii) -> Segmentation:
     name = label_array.metadata['name']
 
     return Segmentation(name, labels)
+
+
+def _get_transform_from_vertex_array(vertex_array)\
+        -> Union[AffineTransform, None]:
+    """Gets the affine transform from a GIfTI vertex array"""
+
+    # GIfTI always contain a transform.
+    gifti_transform = vertex_array.coordsys
+
+    # If the metadata of the vertex array contains the key 'tcs',
+    # use it to create the transform. If is doesn't, only add the
+    # transform if the xform and xformspace are not both unknown.
+    if 'tcs' in vertex_array.metadata:
+        transform = AffineTransform(
+            CoordinateSystem(int(vertex_array.metadata['tcs'])),
+            gifti_transform.xform)
+
+    elif gifti_transform.dataspace != 0 or gifti_transform.xformspace != 0:
+        transform = AffineTransform(
+            _convert_nifti_code_to_coord_sys(gifti_transform.xformspace),
+            gifti_transform.xform)
+
+    else:
+        transform = None
+
+    return transform
