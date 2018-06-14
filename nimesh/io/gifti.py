@@ -371,7 +371,11 @@ def _create_segmentation_from_gii(gii) -> Segmentation:
                       RuntimeWarning)
     label_array = label_arrays[0]
     labels = label_array.data
-    name = label_array.metadata['name']
+
+    if 'name' in label_array.metadata:
+        name = label_array.metadata['name']
+    else:
+        name = ''
 
     return Segmentation(name, labels)
 

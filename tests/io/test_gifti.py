@@ -231,6 +231,32 @@ class TestGifTI(unittest.TestCase):
             np.testing.assert_array_almost_equal(segmentation.keys,
                                                  loaded.keys)
 
+    def test_segmentation_load_missing_name(self):
+        """Test loading a segmentation with no name"""
+
+        gii = nib.gifti.GiftiImage()
+
+        keys = np.array([0, 0, 1, 1], dtype=np.int32)
+        label_array = nib.gifti.GiftiDataArray(
+            keys,
+            intent='NIFTI_INTENT_LABEL',
+            datatype='NIFTI_TYPE_INT32')
+
+        gii.add_gifti_data_array(label_array)
+
+        # Work in a temporary directory. This guarantees cleanup even on error.
+        with tempfile.TemporaryDirectory() as directory:
+
+            # Save the mesh and reload it.
+            filename = os.path.join(directory, 'segmentation.gii')
+            nib.save(gii, filename)
+            loaded = nimesh.io.gifti.load_segmentation(filename)
+
+            # The loaded data should match the saved data.
+            self.assertEqual('', loaded.name)
+            np.testing.assert_array_almost_equal(keys,
+                                                 loaded.keys)
+
     def test_vertex_data_save_load(self):
         """Test saving and loading vertex data"""
 
