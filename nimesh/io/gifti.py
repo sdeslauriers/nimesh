@@ -1,5 +1,5 @@
 import warnings
-from typing import Union
+from typing import List, Union
 
 import nibabel as nib
 
@@ -97,16 +97,7 @@ def load(filename: str) -> Mesh:
         mesh.add_segmentation(segmentation)
 
     # Add the vertex data if any was saved.
-    vertex_data_arrays = gii.get_arrays_from_intent('NIFTI_INTENT_ESTIMATE')
-    for vertex_data_array in vertex_data_arrays:
-
-        if 'name' not in vertex_data_array.meta.metadata:
-            warnings.warn('The file {} contains a vertex data array without '
-                          'a name. It was ignored.'.format(filename))
-            continue
-
-        vertex_data = VertexData(vertex_data_array.meta.metadata['name'],
-                                 vertex_data_array.data)
+    for vertex_data in _get_vertex_data_from_gii(gii):
         mesh.add_vertex_data(vertex_data)
 
     return mesh
@@ -236,13 +227,7 @@ def save(filename: str, mesh: Mesh,
 
     # Save the vertex data if there is any.
     for vertex_data in mesh.vertex_data:
-
-        vertex_data_array = nib.gifti.GiftiDataArray(
-            vertex_data.data.astype('f4'),
-            intent='NIFTI_INTENT_ESTIMATE',
-            datatype='NIFTI_TYPE_FLOAT32',
-            meta={'name': vertex_data.name})
-        gii.add_gifti_data_array(vertex_data_array)
+        _add_vertex_data_to_gii(vertex_data, gii)
 
     nib.save(gii, filename)
 
@@ -288,6 +273,53 @@ def save_segmentation(filename: str,
     nib.save(gii, filename)
 
 
+def load_vertex_data(filename: str) -> List[VertexData]:
+    """Loads per vertex data
+
+    Loads per vertex data from a GIfTI file without loading any other
+    mesh information.
+
+    Args:
+         filename: The name of the file from which to load the data.
+
+    Returns:
+        The vertex data contained in the file.
+
+    """
+
+    gii = nib.load(filename)
+    vertex_data_list = _get_vertex_data_from_gii(gii)
+
+    if len(vertex_data_list) == 0:
+        raise ValueError('The file {} does not contain any vertex data.'
+                         .format(filename))
+    elif len(vertex_data_list) > 1:
+        warnings.warn('The file {} contains more than one vertex data. Only '
+                      'the first was loaded. Proceed with caution.'
+                      .format(filename))
+
+    return vertex_data_list[0]
+
+
+def save_vertex_data(filename: str, vertex_data: VertexData):
+    """Saves per vertex data
+
+    Saves per vertex data to a GIfTI file without any other mesh
+    information. This is useful to generate maps used by workbench.
+
+    Args:
+        filename: The name of the file where the vertex data will be saved.
+            To be compatible with workbench, the file name should end with
+            .func.gii.
+        vertex_data: The vertex data to save.
+
+    """
+
+    gii = nib.gifti.GiftiImage()
+    _add_vertex_data_to_gii(vertex_data, gii)
+    nib.save(gii, filename)
+
+
 def add_segmentation_to_gii(segmentation: Segmentation,
                             gii: nib.gifti.GiftiImage):
     """Adds a segmentation to a nibabel GifTI object.
@@ -311,6 +343,24 @@ def add_segmentation_to_gii(segmentation: Segmentation,
         meta=meta)
 
     gii.add_gifti_data_array(label_array)
+
+
+def _add_vertex_data_to_gii(vertex_data: VertexData,
+                            gii: nib.gifti.GiftiImage):
+    """Adds per vertex data to a nibabel GIfTI object
+
+    Args:
+        vertex_data: The vertex data to add.
+        gii: The GifTI object where the segmentation is added.
+
+    """
+
+    vertex_data_array = nib.gifti.GiftiDataArray(
+        vertex_data.data.astype('f4'),
+        intent='NIFTI_INTENT_ESTIMATE',
+        datatype='NIFTI_TYPE_FLOAT32',
+        meta={'name': vertex_data.name})
+    gii.add_gifti_data_array(vertex_data_array)
 
 
 def _convert_coord_sys_to_nifti_code(coord_sys: CoordinateSystem) -> int:
@@ -374,6 +424,26 @@ def _create_segmentation_from_gii(gii) -> Segmentation:
     name = label_array.metadata['name']
 
     return Segmentation(name, labels)
+
+
+def _get_vertex_data_from_gii(
+        gii: nib.gifti.GiftiImage) -> List[VertexData]:
+    """Returns the per vertex data contains in a GIfTI object"""
+
+    vertex_datas = []
+
+    vertex_data_arrays = gii.get_arrays_from_intent('NIFTI_INTENT_ESTIMATE')
+    for vertex_data_array in vertex_data_arrays:
+
+        if 'name' not in vertex_data_array.meta.metadata:
+            warnings.warn('The file contains a vertex data array without '
+                          'a name. It was ignored.')
+            continue
+
+        vertex_datas.append(VertexData(vertex_data_array.meta.metadata['name'],
+                                       vertex_data_array.data))
+
+    return vertex_datas
 
 
 def _get_transform_from_vertex_array(vertex_array)\

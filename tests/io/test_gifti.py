@@ -231,8 +231,8 @@ class TestGifTI(unittest.TestCase):
             np.testing.assert_array_almost_equal(segmentation.keys,
                                                  loaded.keys)
 
-    def test_vertex_data_save_load(self):
-        """Test saving and loading vertex data"""
+    def test_mesh_vertex_data_save_load(self):
+        """Test saving and loading vertex data in a mesh"""
 
         mesh = minimal_mesh()
 
@@ -257,3 +257,19 @@ class TestGifTI(unittest.TestCase):
             np.testing.assert_array_almost_equal(
                 loaded.vertex_data['b'].data,
                 vertex_data_b.data)
+
+    def test_vertex_data_save(self):
+        """Test saving vertex data"""
+
+        vertex_data = VertexData('test', [0, 1, 2, 3])
+
+        with tempfile.TemporaryDirectory() as directory:
+
+            # Save the vertex data and reload it.
+            filename = os.path.join(directory, 'vertex.func.gii')
+            nimesh.io.gifti.save_vertex_data(filename, vertex_data)
+            loaded = nimesh.io.gifti.load_vertex_data(filename)
+
+            self.assertEqual(vertex_data.name, loaded.name)
+            np.testing.assert_array_almost_equal(
+                vertex_data.data, loaded.data)
