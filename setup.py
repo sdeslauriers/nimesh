@@ -14,7 +14,7 @@ setup(
     description='A Python package to manipulate neuroimaging triangular '
                 'meshes.',
     long_description=long_description,
-    long_description_content_type='test/markdown',
+    long_description_content_type='text/markdown',
     install_requires=['numpy', 'nibabel'],
     extras_requires={
         'visualization': ['vtk'],
