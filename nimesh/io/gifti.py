@@ -2,8 +2,10 @@ import warnings
 from typing import List, Union
 
 import nibabel as nib
+import numpy as np
 
 from nimesh import AffineTransform, CoordinateSystem, Mesh, Segmentation
+from nimesh import Label
 from nimesh.core import VertexData
 
 
@@ -344,6 +346,23 @@ def add_segmentation_to_gii(segmentation: Segmentation,
 
     gii.add_gifti_data_array(label_array)
 
+    # Add the labels of the segmentation.
+    gii_label_table = nib.gifti.GiftiLabelTable()
+    for key, label in segmentation.labels.items():
+
+        # The color in a GIfTI is saved as a float.
+        color = np.array(label.color) / 255
+
+        # Create the GIfTI label. It requires both a label and a key
+        # attribute to be added dynamically, although this is mentioned
+        # nowhere.
+        gii_label = nib.gifti.GiftiLabel(key, *color)
+        gii_label.label = label.name
+        gii_label.key = key
+        gii_label_table.labels.append(gii_label)
+
+    gii.labeltable = gii_label_table
+
 
 def _add_vertex_data_to_gii(vertex_data: VertexData,
                             gii: nib.gifti.GiftiImage):
@@ -423,7 +442,16 @@ def _create_segmentation_from_gii(gii) -> Segmentation:
     labels = label_array.data
     name = label_array.metadata['name']
 
-    return Segmentation(name, labels)
+    segmentation = Segmentation(name, labels)
+
+    # Add the labels.
+    for label in gii.labeltable.labels:
+
+        # Convert the color back to integers.
+        color = np.round(np.array(label.rgba) * 255).astype(int)
+        segmentation.add_label(label.key, Label(label.label, color))
+
+    return segmentation
 
 
 def _get_vertex_data_from_gii(

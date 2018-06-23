@@ -7,6 +7,7 @@ import numpy as np
 import nibabel as nib
 import nimesh.io
 from nimesh import AffineTransform, CoordinateSystem, Mesh, Segmentation
+from nimesh import Label
 from nimesh.core import VertexData
 
 
@@ -218,6 +219,10 @@ class TestGifTI(unittest.TestCase):
         """Test saving a loading segmentations."""
 
         segmentation = Segmentation('test', [0, 0, 1, 1, 2, 2, 3, 3])
+        segmentation.add_label(0, Label('unknown'))
+        segmentation.add_label(1, Label('red', (1, 0, 0, 1)))
+        segmentation.add_label(2, Label('green', (0, 1, 0, 1)))
+        segmentation.add_label(3, Label('blue', (0, 0, 1, 1)))
 
         # Work in a temporary directory. This guarantees cleanup even on error.
         with tempfile.TemporaryDirectory() as directory:
@@ -230,6 +235,17 @@ class TestGifTI(unittest.TestCase):
             # The loaded data should match the saved data.
             np.testing.assert_array_almost_equal(segmentation.keys,
                                                  loaded.keys)
+
+            # Verify that the labels where loaded correctly.
+            self.assertEqual(len(loaded.labels), 4)
+            self.assertEqual(loaded.labels[0].name, 'unknown')
+            self.assertTupleEqual(loaded.labels[0].color, (0, 0, 0, 0))
+            self.assertEqual(loaded.labels[1].name, 'red')
+            self.assertTupleEqual(loaded.labels[1].color, (1, 0, 0, 1))
+            self.assertEqual(loaded.labels[2].name, 'green')
+            self.assertTupleEqual(loaded.labels[2].color, (0, 1, 0, 1))
+            self.assertEqual(loaded.labels[3].name, 'blue')
+            self.assertTupleEqual(loaded.labels[3].color, (0, 0, 1, 1))
 
     def test_mesh_vertex_data_save_load(self):
         """Test saving and loading vertex data in a mesh"""
