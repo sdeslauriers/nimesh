@@ -143,27 +143,17 @@ class Mesh(object):
 
         """
 
-        # Special case of vertices or triangles set to None.
-        if vertices is None or triangles is None:
-            raise TypeError('\'vertices\' and \'triangles\' cannot be None')
+        self._vertices = None
 
-        # Try to convert the vertices and triangles to numpy arrays.
-        try:
-            vertices = np.array(vertices, dtype=np.float64)
-        except Exception:
-            raise TypeError('\'vertices\' must be convertible to a numpy '
-                            'array of floats.')
+        # Special case of vertices or triangles set to None.
+        if triangles is None:
+            raise TypeError('\'triangles\' cannot be None')
 
         try:
             triangles = np.array(triangles, dtype=np.int64)
         except Exception:
             raise TypeError('\'triangles\' must be convertible to a numpy '
                             'array of integers.')
-
-        # The shape of vertices and triangles must be (?, 3).
-        if vertices.ndim != 2 or vertices.shape[1] != 3:
-            raise ValueError('\'vertices\' must have a shape of (N, 3) not '
-                             '{}.'.format(vertices.shape))
 
         if triangles.ndim != 2 or triangles.shape[1] != 3:
             raise ValueError('\'triangles\' must have a shape of (M, 3) not '
@@ -174,7 +164,7 @@ class Mesh(object):
                             'CoordinateSystem, not a {}.'
                             .format(type(coordinate_system)))
 
-        self._vertices = vertices
+        self.vertices = vertices
         self._triangles = triangles
         self._coordinate_system = coordinate_system
 
@@ -279,6 +269,33 @@ class Mesh(object):
     def vertices(self) -> np.array:
         """Returns a copy of the mesh's vertices."""
         return self._vertices.copy()
+
+    @vertices.setter
+    def vertices(self, vertices):
+        """Sets the vertices of the mesh"""
+
+        if vertices is None:
+            raise TypeError('\'vertices\' cannot be None')
+
+        # Try to convert the vertices and triangles to numpy arrays.
+        try:
+            vertices = np.array(vertices, dtype=np.float64)
+        except Exception:
+            raise TypeError('\'vertices\' must be convertible to a numpy '
+                            'array of floats.')
+
+        # The shape of vertices and triangles must be (?, 3).
+        if vertices.ndim != 2 or vertices.shape[1] != 3:
+            raise ValueError('\'vertices\' must have a shape of (N, 3) not '
+                             '{}.'.format(vertices.shape))
+
+        # The number of new vertices must match the old number of vertices.
+        if self._vertices is not None and len(vertices) != self.nb_vertices:
+            raise ValueError('Changing the number of vertices is not '
+                             'permitted ({} != {}).'
+                             .format(len(vertices), self.nb_vertices))
+
+        self._vertices = vertices.copy()
 
     def add_segmentation(self, segmentation: 'Segmentation'):
         """Adds a segmentation to the mesh.
