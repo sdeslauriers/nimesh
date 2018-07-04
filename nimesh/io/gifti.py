@@ -10,14 +10,14 @@ from nimesh.core import VertexData
 
 
 def load(filename: str) -> Mesh:
-    """Loads a mesh from a GifTI file
+    """Loads a mesh from a GIfTI file
 
-    Loads the vertices and triangles of a mesh in the GifTI file format. If
+    Loads the vertices and triangles of a mesh in the GIfTI file format. If
     a transform or segmentation is contained in the file, they will also be
     loaded.
 
     Args:
-        filename: The name of the GifTI file to load.
+        filename: The name of the GIfTI file to load.
 
     Returns:
         mesh: The mesh loaded from the supplied file.
@@ -94,7 +94,7 @@ def load(filename: str) -> Mesh:
         mesh.add_transform(transform)
 
     # Add the segmentation if one was saved.
-    segmentation = _create_segmentation_from_gii(gii)
+    segmentation = _get_segmentation_from_gii(gii)
     if segmentation is not None:
         mesh.add_segmentation(segmentation)
 
@@ -106,16 +106,16 @@ def load(filename: str) -> Mesh:
 
 
 def load_segmentation(filename: str) -> Segmentation:
-    """Loads a segmentation from a GifTI file.
+    """Loads a segmentation from a GIfTI file.
 
-    Loads the segmentation of a mesh from a GifTI file without loading the
+    Loads the segmentation of a mesh from a GIfTI file without loading the
     mesh data.
 
     Args:
         filename: The name of the file from which to load the segmentation.
 
     Returns:
-        segmentation: The segmentation loaded from the GifTI file.
+        segmentation: The segmentation loaded from the GIfTI file.
 
     Raises:
         ValueError: If the file does not contain a segmentation.
@@ -124,7 +124,7 @@ def load_segmentation(filename: str) -> Segmentation:
 
     gii = nib.load(filename)
 
-    segmentation = _create_segmentation_from_gii(gii)
+    segmentation = _get_segmentation_from_gii(gii)
 
     if segmentation is None:
         raise ValueError('The file {} does not contain any segmentation data.'
@@ -133,10 +133,38 @@ def load_segmentation(filename: str) -> Segmentation:
     return segmentation
 
 
-def save(filename: str, mesh: Mesh):
-    """Save a mesh to a GifTI file.
+def load_vertex_data(filename: str) -> VertexData:
+    """Loads per vertex data
 
-    Saves the mesh and its metadata to a GifTI file.
+    Loads per vertex data from a GIfTI file without loading any other
+    mesh information.
+
+    Args:
+         filename: The name of the file from which to load the data.
+
+    Returns:
+        The vertex data contained in the file.
+
+    """
+
+    gii = nib.load(filename)
+    vertex_data_list = _get_vertex_data_from_gii(gii)
+
+    if len(vertex_data_list) == 0:
+        raise ValueError('The file {} does not contain any vertex data.'
+                         .format(filename))
+    elif len(vertex_data_list) > 1:
+        warnings.warn('The file {} contains more than one vertex data. Only '
+                      'the first was loaded. Proceed with caution.'
+                      .format(filename))
+
+    return vertex_data_list[0]
+
+
+def save(filename: str, mesh: Mesh):
+    """Save a mesh to a GIfTI file.
+
+    Saves the mesh and its metadata to a GIfTI file.
 
     Args:
         filename: The name of the file were the mesh will be saved. If it
@@ -152,16 +180,16 @@ def save(filename: str, mesh: Mesh):
 
     gii = nib.gifti.GiftiImage()
 
-    # The GifTI file format only allows saving one segmentation. If the mesh
+    # The GIfTI file format only allows saving one segmentation. If the mesh
     # contains more that one, warn the user and save only the first one.
     segmentations = mesh.segmentations
     if len(segmentations) > 1:
-        warnings.warn('The mesh has more that one segmentation, but GifTI '
+        warnings.warn('The mesh has more that one segmentation, but GIfTI '
                       'only supports one segmentation per file. Only the '
                       'first segmentation will be saved.')
 
     if len(segmentations) != 0:
-        add_segmentation_to_gii(segmentations[0], gii)
+        _add_segmentation_to_gii(segmentations[0], gii)
 
     # Add the vertices and triangles to the mesh.
     _add_mesh_to_gii(mesh, gii)
@@ -207,10 +235,10 @@ def save_segmentation(filename: str,
                       segmentation: Segmentation,
                       anatomical_structure_primary: str = 'Cortex',
                       anatomical_structure_secondary: str = 'GrayWhite',
-                      geometric_type: str = 'Anatomical') -> None:
-    """Save a segmentation to a GifTI image.
+                      geometric_type: str = 'Anatomical'):
+    """Save a segmentation to a GIfTI image.
 
-    Save a the segmentation of a mesh into a GifTI file without saving the
+    Save a the segmentation of a mesh into a GIfTI file without saving the
     mesh itself.
 
     Args:
@@ -239,37 +267,9 @@ def save_segmentation(filename: str,
         nib.gifti.GiftiNVPairs('GeometricType',
                                geometric_type))
 
-    add_segmentation_to_gii(segmentation, gii)
+    _add_segmentation_to_gii(segmentation, gii)
 
     nib.save(gii, filename)
-
-
-def load_vertex_data(filename: str) -> List[VertexData]:
-    """Loads per vertex data
-
-    Loads per vertex data from a GIfTI file without loading any other
-    mesh information.
-
-    Args:
-         filename: The name of the file from which to load the data.
-
-    Returns:
-        The vertex data contained in the file.
-
-    """
-
-    gii = nib.load(filename)
-    vertex_data_list = _get_vertex_data_from_gii(gii)
-
-    if len(vertex_data_list) == 0:
-        raise ValueError('The file {} does not contain any vertex data.'
-                         .format(filename))
-    elif len(vertex_data_list) > 1:
-        warnings.warn('The file {} contains more than one vertex data. Only '
-                      'the first was loaded. Proceed with caution.'
-                      .format(filename))
-
-    return vertex_data_list[0]
 
 
 def save_vertex_data(filename: str, vertex_data: VertexData):
@@ -299,7 +299,7 @@ def _add_mesh_to_gii(mesh: Mesh, gii: nib.gifti.GiftiImage):
 
     Args:
         mesh: The mesh that contains the vertices and triangles to add.
-        gii: The GifTI object where the segmentation is added.
+        gii: The GIfTI object where the segmentation is added.
 
     """
 
@@ -310,12 +310,12 @@ def _add_mesh_to_gii(mesh: Mesh, gii: nib.gifti.GiftiImage):
         'cs': str(mesh.coordinate_system.value)
     }
 
-    # For now, the GifTI implementation of nibabel seems to support only a
+    # For now, the GIfTI implementation of nibabel seems to support only a
     # single transform. If the mesh has more than one, warn the user and
     # save the first one.
     transforms = mesh.transforms
     if len(transforms) > 1:
-        warnings.warn('The mesh has more than one transform but GifTI only '
+        warnings.warn('The mesh has more than one transform but GIfTI only '
                       'supports a single transform. Only the first one will '
                       'be saved.')
 
@@ -346,16 +346,16 @@ def _add_mesh_to_gii(mesh: Mesh, gii: nib.gifti.GiftiImage):
     gii.add_gifti_data_array(triangles_array)
 
 
-def add_segmentation_to_gii(segmentation: Segmentation,
-                            gii: nib.gifti.GiftiImage):
-    """Adds a segmentation to a nibabel GifTI object.
+def _add_segmentation_to_gii(segmentation: Segmentation,
+                             gii: nib.gifti.GiftiImage):
+    """Adds a segmentation to a nibabel GIfTI object.
 
-    Add the segmentation data to a nibabel GifTI object by adding a new data
+    Add the segmentation data to a nibabel GIfTI object by adding a new data
     array.
 
     Args:
-        segmentation: The segmentation to add to the GifTI object.
-        gii: The GifTI object where the segmentation is added.
+        segmentation: The segmentation to add to the GIfTI object.
+        gii: The GIfTI object where the segmentation is added.
 
     """
 
@@ -394,7 +394,7 @@ def _add_vertex_data_to_gii(vertex_data: VertexData,
 
     Args:
         vertex_data: The vertex data to add.
-        gii: The GifTI object where the segmentation is added.
+        gii: The GIfTI object where the segmentation is added.
 
     """
 
@@ -436,15 +436,15 @@ def _convert_nifti_code_to_coord_sys(code: int) -> CoordinateSystem:
     return convert[code]
 
 
-def _create_segmentation_from_gii(gii) -> Segmentation:
-    """Creates a segmentation from a nibabel GifTI object.
+def _get_segmentation_from_gii(gii) -> Segmentation:
+    """Creates a segmentation from a nibabel GIfTI object.
 
-    Creates a new segmentation from the data array of a nibabel GifTI
+    Creates a new segmentation from the data array of a nibabel GIfTI
     object. If none of the data arrays have an intent of NIFTI_INTENT_LABEL,
     None is returned.
 
     Args:
-        gii: The nibabel GifTI object from which to create the segmentation.
+        gii: The nibabel GIfTI object from which to create the segmentation.
 
     Returns:
         segmentation: The loaded segmentation or None.
