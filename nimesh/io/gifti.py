@@ -1,9 +1,11 @@
 import warnings
-from typing import Union
+from typing import List, Union
 
 import nibabel as nib
+import numpy as np
 
 from nimesh import AffineTransform, CoordinateSystem, Mesh, Segmentation
+from nimesh import Label
 from nimesh.core import VertexData
 
 
@@ -97,16 +99,7 @@ def load(filename: str) -> Mesh:
         mesh.add_segmentation(segmentation)
 
     # Add the vertex data if any was saved.
-    vertex_data_arrays = gii.get_arrays_from_intent('NIFTI_INTENT_ESTIMATE')
-    for vertex_data_array in vertex_data_arrays:
-
-        if 'name' not in vertex_data_array.meta.metadata:
-            warnings.warn('The file {} contains a vertex data array without '
-                          'a name. It was ignored.'.format(filename))
-            continue
-
-        vertex_data = VertexData(vertex_data_array.meta.metadata['name'],
-                                 vertex_data_array.data)
+    for vertex_data in _get_vertex_data_from_gii(gii):
         mesh.add_vertex_data(vertex_data)
 
     return mesh
@@ -140,10 +133,7 @@ def load_segmentation(filename: str) -> Segmentation:
     return segmentation
 
 
-def save(filename: str, mesh: Mesh,
-         anatomical_structure_primary: str = 'Cortex',
-         anatomical_structure_secondary: str = 'GrayWhite',
-         geometric_type: str = 'Anatomical') -> None:
+def save(filename: str, mesh: Mesh):
     """Save a mesh to a GifTI file.
 
     Saves the mesh and its metadata to a GifTI file.
@@ -173,58 +163,8 @@ def save(filename: str, mesh: Mesh,
     if len(segmentations) != 0:
         add_segmentation_to_gii(segmentations[0], gii)
 
-    # The coordinate system is saved in the metadata of the vertex array.
-    # Because it is possible to save the coordinate system of the points
-    # without having a transform, we add it to the metadata.
-    meta = {
-        'cs': str(mesh.coordinate_system.value)
-    }
-
-    # For now, the GifTI implementation of nibabel seems to support only a
-    # single transform. If the mesh has more than one, warn the user and
-    # save the first one.
-    transforms = mesh.transforms
-    if len(transforms) > 1:
-        warnings.warn('The mesh has more than one transform but GifTI only '
-                      'supports a single transform. Only the first one will '
-                      'be saved.')
-
-    if len(transforms) != 0:
-        transform = transforms[0]
-        coordinate_system = nib.gifti.GiftiCoordSystem(
-            _convert_coord_sys_to_nifti_code(mesh.coordinate_system),
-            _convert_coord_sys_to_nifti_code(transform.transform_coord_sys),
-            transform.affine)
-        meta['tcs'] = str(transform.transform_coord_sys.value)
-    else:
-        coordinate_system = None
-
-    vertices_array = nib.gifti.GiftiDataArray(
-        mesh.vertices.astype('f4'),
-        intent='NIFTI_INTENT_POINTSET',
-        datatype='NIFTI_TYPE_FLOAT32',
-        meta=meta,
-        coordsys=coordinate_system
-    )
-
-    # Add metadata for Workbench. In a surface file, the meta data of the
-    # structure is in the meta of the point set array.
-    vertices_array.meta.data.append(
-        nib.gifti.GiftiNVPairs('AnatomicalStructurePrimary',
-                               anatomical_structure_primary))
-    vertices_array.meta.data.append(
-        nib.gifti.GiftiNVPairs('AnatomicalStructureSecondary',
-                               anatomical_structure_secondary))
-    vertices_array.meta.data.append(
-        nib.gifti.GiftiNVPairs('GeometricType', geometric_type))
-
-    gii.add_gifti_data_array(vertices_array)
-
-    triangles_array = nib.gifti.GiftiDataArray(
-        mesh.triangles.astype('i4'),
-        intent='NIFTI_INTENT_TRIANGLE',
-        datatype='NIFTI_TYPE_INT32')
-    gii.add_gifti_data_array(triangles_array)
+    # Add the vertices and triangles to the mesh.
+    _add_mesh_to_gii(mesh, gii)
 
     # Save the normals if they exist.
     if mesh.normals is not None:
@@ -236,14 +176,30 @@ def save(filename: str, mesh: Mesh,
 
     # Save the vertex data if there is any.
     for vertex_data in mesh.vertex_data:
+        _add_vertex_data_to_gii(vertex_data, gii)
 
-        vertex_data_array = nib.gifti.GiftiDataArray(
-            vertex_data.data.astype('f4'),
-            intent='NIFTI_INTENT_ESTIMATE',
-            datatype='NIFTI_TYPE_FLOAT32',
-            meta={'name': vertex_data.name})
-        gii.add_gifti_data_array(vertex_data_array)
+    nib.save(gii, filename)
 
+
+def save_mesh(filename: str, mesh: Mesh):
+    """Saves a mesh into a GIfTI file
+
+    Saves the vertices and triangles of a mesh into a GIfTI file without
+    adding any other information. This is useful to save files compatible
+    with Connectome Workbench which expects meshes, segmentations,
+    and vertex data in separate files.
+
+    Args:
+        filename: The name of the file where the segmentation is saved. If
+            it already exists, it will be overwritten.
+        mesh: The mesh to save to the file.
+
+    """
+
+    # Create a bare bone GIfTI with only the mesh vertices and triangles and
+    # save it.
+    gii = nib.gifti.GiftiImage()
+    _add_mesh_to_gii(mesh, gii)
     nib.save(gii, filename)
 
 
@@ -288,6 +244,108 @@ def save_segmentation(filename: str,
     nib.save(gii, filename)
 
 
+def load_vertex_data(filename: str) -> List[VertexData]:
+    """Loads per vertex data
+
+    Loads per vertex data from a GIfTI file without loading any other
+    mesh information.
+
+    Args:
+         filename: The name of the file from which to load the data.
+
+    Returns:
+        The vertex data contained in the file.
+
+    """
+
+    gii = nib.load(filename)
+    vertex_data_list = _get_vertex_data_from_gii(gii)
+
+    if len(vertex_data_list) == 0:
+        raise ValueError('The file {} does not contain any vertex data.'
+                         .format(filename))
+    elif len(vertex_data_list) > 1:
+        warnings.warn('The file {} contains more than one vertex data. Only '
+                      'the first was loaded. Proceed with caution.'
+                      .format(filename))
+
+    return vertex_data_list[0]
+
+
+def save_vertex_data(filename: str, vertex_data: VertexData):
+    """Saves per vertex data
+
+    Saves per vertex data to a GIfTI file without any other mesh
+    information. This is useful to generate maps used by workbench.
+
+    Args:
+        filename: The name of the file where the vertex data will be saved.
+            To be compatible with workbench, the file name should end with
+            .func.gii.
+        vertex_data: The vertex data to save.
+
+    """
+
+    gii = nib.gifti.GiftiImage()
+    _add_vertex_data_to_gii(vertex_data, gii)
+    nib.save(gii, filename)
+
+
+def _add_mesh_to_gii(mesh: Mesh, gii: nib.gifti.GiftiImage):
+    """Adds a mesh to a nibabel GIfTI object
+
+    Adds the vertices and triangles of a mesh to a GIfTI object by adding
+    two new data arrays.
+
+    Args:
+        mesh: The mesh that contains the vertices and triangles to add.
+        gii: The GifTI object where the segmentation is added.
+
+    """
+
+    # The coordinate system is saved in the metadata of the vertex array.
+    # Because it is possible to save the coordinate system of the points
+    # without having a transform, we add it to the metadata.
+    meta = {
+        'cs': str(mesh.coordinate_system.value)
+    }
+
+    # For now, the GifTI implementation of nibabel seems to support only a
+    # single transform. If the mesh has more than one, warn the user and
+    # save the first one.
+    transforms = mesh.transforms
+    if len(transforms) > 1:
+        warnings.warn('The mesh has more than one transform but GifTI only '
+                      'supports a single transform. Only the first one will '
+                      'be saved.')
+
+    if len(transforms) != 0:
+        transform = transforms[0]
+        coordinate_system = nib.gifti.GiftiCoordSystem(
+            _convert_coord_sys_to_nifti_code(mesh.coordinate_system),
+            _convert_coord_sys_to_nifti_code(transform.transform_coord_sys),
+            transform.affine)
+        meta['tcs'] = str(transform.transform_coord_sys.value)
+    else:
+        coordinate_system = None
+
+    vertices_array = nib.gifti.GiftiDataArray(
+        mesh.vertices.astype('f4'),
+        intent='NIFTI_INTENT_POINTSET',
+        datatype='NIFTI_TYPE_FLOAT32',
+        meta=meta,
+        coordsys=coordinate_system
+    )
+
+    gii.add_gifti_data_array(vertices_array)
+
+    triangles_array = nib.gifti.GiftiDataArray(
+        mesh.triangles.astype('i4'),
+        intent='NIFTI_INTENT_TRIANGLE',
+        datatype='NIFTI_TYPE_INT32')
+    gii.add_gifti_data_array(triangles_array)
+
+
 def add_segmentation_to_gii(segmentation: Segmentation,
                             gii: nib.gifti.GiftiImage):
     """Adds a segmentation to a nibabel GifTI object.
@@ -311,6 +369,41 @@ def add_segmentation_to_gii(segmentation: Segmentation,
         meta=meta)
 
     gii.add_gifti_data_array(label_array)
+
+    # Add the labels of the segmentation.
+    gii_label_table = nib.gifti.GiftiLabelTable()
+    for key, label in segmentation.labels.items():
+
+        # The color in a GIfTI is saved as a float.
+        color = np.array(label.color) / 255
+
+        # Create the GIfTI label. It requires both a label and a key
+        # attribute to be added dynamically, although this is mentioned
+        # nowhere.
+        gii_label = nib.gifti.GiftiLabel(key, *color)
+        gii_label.label = label.name
+        gii_label.key = key
+        gii_label_table.labels.append(gii_label)
+
+    gii.labeltable = gii_label_table
+
+
+def _add_vertex_data_to_gii(vertex_data: VertexData,
+                            gii: nib.gifti.GiftiImage):
+    """Adds per vertex data to a nibabel GIfTI object
+
+    Args:
+        vertex_data: The vertex data to add.
+        gii: The GifTI object where the segmentation is added.
+
+    """
+
+    vertex_data_array = nib.gifti.GiftiDataArray(
+        vertex_data.data.astype('f4'),
+        intent='NIFTI_INTENT_ESTIMATE',
+        datatype='NIFTI_TYPE_FLOAT32',
+        meta={'name': vertex_data.name})
+    gii.add_gifti_data_array(vertex_data_array)
 
 
 def _convert_coord_sys_to_nifti_code(coord_sys: CoordinateSystem) -> int:
@@ -373,7 +466,36 @@ def _create_segmentation_from_gii(gii) -> Segmentation:
     labels = label_array.data
     name = label_array.metadata['name']
 
-    return Segmentation(name, labels)
+    segmentation = Segmentation(name, labels)
+
+    # Add the labels.
+    for label in gii.labeltable.labels:
+
+        # Convert the color back to integers.
+        color = np.round(np.array(label.rgba) * 255).astype(int)
+        segmentation.add_label(label.key, Label(label.label, color))
+
+    return segmentation
+
+
+def _get_vertex_data_from_gii(
+        gii: nib.gifti.GiftiImage) -> List[VertexData]:
+    """Returns the per vertex data contains in a GIfTI object"""
+
+    vertex_datas = []
+
+    vertex_data_arrays = gii.get_arrays_from_intent('NIFTI_INTENT_ESTIMATE')
+    for vertex_data_array in vertex_data_arrays:
+
+        if 'name' not in vertex_data_array.meta.metadata:
+            warnings.warn('The file contains a vertex data array without '
+                          'a name. It was ignored.')
+            continue
+
+        vertex_datas.append(VertexData(vertex_data_array.meta.metadata['name'],
+                                       vertex_data_array.data))
+
+    return vertex_datas
 
 
 def _get_transform_from_vertex_array(vertex_array)\
