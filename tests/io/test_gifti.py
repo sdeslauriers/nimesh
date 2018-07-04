@@ -122,6 +122,34 @@ class TestGifTI(unittest.TestCase):
                 loaded.transforms[0].transform_coord_sys,
                 CoordinateSystem.MNI)
 
+    def test_mesh_only_save_load(self):
+        """Test saving and loading the vertices and triangles of a mesh."""
+
+        mesh = minimal_mesh()
+
+        # Add a segmentation.
+        segmentation = Segmentation('seg', [0, 0, 1, 1])
+        mesh.add_segmentation(segmentation)
+
+        # Work in a temporary directory. This guarantees cleanup even on error.
+        with tempfile.TemporaryDirectory() as directory:
+
+            # Save the mesh and reload it.
+            filename = os.path.join(directory, 'mesh.gii')
+            nimesh.io.gifti.save_mesh(filename, mesh)
+            loaded = nimesh.io.load(filename)
+
+            # The coordinate system should not have changed.
+            self.assertEqual(mesh.coordinate_system, loaded.coordinate_system)
+
+            # The loaded data should match the saved data. Because there is no
+            # data manipulation, this should be bit perfect.
+            np.testing.assert_array_equal(mesh.vertices, loaded.vertices)
+            np.testing.assert_array_equal(mesh.triangles, loaded.triangles)
+
+            # The segmentation should not have been saved.
+            self.assertEqual(len(loaded.segmentations), 0)
+
     def test_minimal_save_load(self):
         """Test saving and loading with a minimal mesh."""
 
