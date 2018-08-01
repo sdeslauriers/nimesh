@@ -7,16 +7,13 @@ import numpy as np
 from nimesh import CoordinateSystem, Label, Mesh, Segmentation
 
 
-def load(surface: str, annotation: str = None) -> Mesh:
+def load_mesh(surface: str) -> Mesh:
     """Loads a FreeSurfer surface mesh.
 
-    Loads a mesh from a FreeSurfer geometry file, optionally loading
-    annotations.
+    Loads a mesh from a FreeSurfer geometry file.
 
     Args:
         surface: The FreeSurfer geometry file, e.g. lh.pial or rh.white.
-        annotation (optional): The annotation file to load, for example
-            lh.aparc.DKTatlas.annot or lh.aparc.annot.
 
     Returns:
         mesh: The loaded mesh.
@@ -28,14 +25,7 @@ def load(surface: str, annotation: str = None) -> Mesh:
     if 'cras' in meta:
         vertices += meta['cras']
 
-    mesh = Mesh(vertices, triangles)
-
-    # Load the annotations, if requested.
-    if annotation is not None:
-        segmentation = load_segmentation(annotation)
-        mesh.add_segmentation(segmentation)
-
-    return mesh
+    return Mesh(vertices, triangles)
 
 
 def load_segmentation(filename: str) -> Segmentation:
