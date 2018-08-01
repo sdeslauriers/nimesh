@@ -464,7 +464,14 @@ def _get_segmentation_from_gii(gii) -> Segmentation:
                       RuntimeWarning)
     label_array = label_arrays[0]
     labels = label_array.data
-    name = label_array.metadata['name']
+
+    # If a segmentation name was not saved, tell the user and give it a name.
+    if 'name' in label_array.metadata:
+        name = label_array.metadata['name']
+    else:
+        warnings.warn('The name of the segmentation was not saved. Naming '
+                      'it as "unknown".')
+        name = 'unknown'
 
     segmentation = Segmentation(name, labels)
 

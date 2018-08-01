@@ -243,6 +243,42 @@ class TestGifTI(unittest.TestCase):
             np.testing.assert_array_almost_equal(loaded_segmentation.keys,
                                                  segmentation.keys)
 
+    def test_nameless_segmentation_load(self):
+        """Test loading a segmentation with no name"""
+
+        # Use nibabel directly to save a segmentation with no name.
+        gii = nib.gifti.GiftiImage()
+
+        label_array = nib.gifti.GiftiDataArray(
+            [0, 0, 1, 1],
+            intent='NIFTI_INTENT_LABEL',
+            datatype='NIFTI_TYPE_INT32')
+
+        gii.add_gifti_data_array(label_array)
+
+        # Add the labels of the segmentation.
+        gii_label_table = nib.gifti.GiftiLabelTable()
+        gii_label = nib.gifti.GiftiLabel(0, 255, 0, 0, 0)
+        gii_label.label = 'label 0'
+        gii_label.key = 0
+        gii_label_table.labels.append(gii_label)
+        gii_label = nib.gifti.GiftiLabel(0, 0, 255, 0, 0)
+        gii_label.label = 'label 1'
+        gii_label.key = 1
+        gii_label_table.labels.append(gii_label)
+
+        gii.labeltable = gii_label_table
+
+        # Work in a temporary directory. This guarantees cleanup even on error.
+        with tempfile.TemporaryDirectory() as directory:
+
+            filename = os.path.join(directory, 'nameless-segmentation.gii')
+            nib.save(gii, filename)
+
+            # Load it with nimesh, the name should be unknown.
+            segmentation = nimesh.io.gifti.load_segmentation(filename)
+            self.assertEqual(segmentation.name, 'unknown')
+
     def test_segmentation_save_load(self):
         """Test saving a loading segmentations."""
 
