@@ -1,18 +1,31 @@
 import os.path
+from os.path import isdir
 
 from nimesh import Mesh
 from nimesh.io import gifti
 from nimesh.io import freesurfer
 
 
-def load(filename: str) -> Mesh:
+def load(filename: str, hemisphere: str = 'lh', surface: str = 'pial') -> Mesh:
     """Loads a mesh from a file.
 
-    The file format is detected from the filename extension. For now, the only
-    supported file format is GifTI (.gii).
+    The file format is detected from the filename extension. The supported file
+    formats are:
+        - .gii : GifTI file containing a mesh and associated information
+
+    In addition to those formats, if the filename points to a directory,
+    a FreeSurfer subject directory is assumed and a mesh will be loaded
+    according to the `hemisphere` and `surface` parameters.
 
     Args:
-        filename: The name of the file to load. Must have a .gii extension.
+        filename: The name of the file to load.
+        hemisphere: If the filename is a FreeSurfer subject directory,
+            `hemisphere` specifies which hemisphere to load. Must be 'lh' or
+            'rh'. Ignored if the filename is not a FreeSurfer directory.
+        surface: If the filename is a FreeSurfer subject directory,
+            `surface` specifies which surface to load. Must be 'pial',
+            'white', 'inflated', or 'smoothwm'. Ignored if the filename is
+            not a FreeSurfer directory.
 
     Returns:
         mesh: The mesh contained in the supplied file.
@@ -26,6 +39,9 @@ def load(filename: str) -> Mesh:
 
     if extension == '.gii':
         mesh = gifti.load(filename)
+
+    elif isdir(filename):
+        mesh = freesurfer.load(filename, hemisphere, surface)
 
     else:
         raise ValueError('Unknown file format {}.'.format(extension))
