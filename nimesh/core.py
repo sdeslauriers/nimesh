@@ -2,7 +2,10 @@ import numpy as np
 from enum import IntEnum
 from typing import List, Sequence, Union
 
-from .mixins import Named, ListOfNamed
+from scipy.sparse import csr_matrix
+
+from nimesh.asarray import adjacency_matrix
+from nimesh.mixins import Named, ListOfNamed
 
 
 class AffineTransform(object):
@@ -179,6 +182,20 @@ class Mesh(object):
     def __repr__(self) -> str:
         return 'Mesh: {} vertices, {} triangles'.format(self.nb_vertices,
                                                         self.nb_triangles)
+
+    @property
+    def adjacency_matrix(self) -> csr_matrix:
+        """Returns the adjacency matrix of the mesh
+
+        Returns a boolean scipy.sparse.csr_matrix with a shape of (N, N) where
+        N is the number of vertices of the mesh. The element (i, j) is True
+        if the vertices i and j share a triangle and False elsewhere. To
+        transform the matrix to a dense numpy array, use the `todense`
+        method of the returned matrix.
+
+        """
+
+        return adjacency_matrix(self.triangles, self.nb_vertices)
 
     @property
     def coordinate_system(self) -> CoordinateSystem:
