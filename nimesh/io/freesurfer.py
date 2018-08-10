@@ -1,5 +1,6 @@
 import os
 import warnings
+from os.path import isfile
 from os.path import join
 from typing import Tuple
 from typing import Union
@@ -58,13 +59,16 @@ def load(subject_directory: str, hemisphere: str, surface: str) -> Mesh:
     label_dir = join(subject_directory, 'label')
 
     desikan_file = join(label_dir, hemisphere + '.aparc.annot')
-    mesh.add_segmentation(load_segmentation(desikan_file))
+    if isfile(desikan_file):
+        mesh.add_segmentation(load_segmentation(desikan_file))
 
     dkt_file = join(label_dir, hemisphere + '.aparc.DKTatlas.annot')
-    mesh.add_segmentation(load_segmentation(dkt_file))
+    if isfile(dkt_file):
+        mesh.add_segmentation(load_segmentation(dkt_file))
 
     destrieux_file = join(label_dir, hemisphere + '.aparc.a2009s.annot')
-    mesh.add_segmentation(load_segmentation(destrieux_file))
+    if isfile(destrieux_file):
+        mesh.add_segmentation(load_segmentation(destrieux_file))
 
     return mesh
 
