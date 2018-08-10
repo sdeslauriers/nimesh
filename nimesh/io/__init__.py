@@ -12,6 +12,8 @@ def load(filename: str, hemisphere: str = 'lh', surface: str = 'pial') -> Mesh:
     The file format is detected from the filename extension. The supported file
     formats are:
         - .gii : GifTI file containing a mesh and associated information
+        - .white, .pial, .inflated, .smoothwm, .surf : FreeSurfer meshes
+            with no associated information
 
     In addition to those formats, if the filename points to a directory,
     a FreeSurfer subject directory is assumed and a mesh will be loaded
@@ -39,6 +41,9 @@ def load(filename: str, hemisphere: str = 'lh', surface: str = 'pial') -> Mesh:
 
     if extension == '.gii':
         mesh = gifti.load(filename)
+
+    elif extension in ('.white', '.pial', '.inflated', '.smoothwm', '.surf'):
+        mesh = freesurfer.load_mesh(filename)
 
     elif isdir(filename):
         mesh = freesurfer.load(filename, hemisphere, surface)
