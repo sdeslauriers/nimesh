@@ -7,6 +7,7 @@ import numpy as np
 import nibabel as nib
 import nimesh.io
 from nimesh import AffineTransform, CoordinateSystem, Mesh, Segmentation
+from nimesh import Label
 from nimesh.core import VertexData
 
 
@@ -121,6 +122,34 @@ class TestGifTI(unittest.TestCase):
                 loaded.transforms[0].transform_coord_sys,
                 CoordinateSystem.MNI)
 
+    def test_mesh_only_save_load(self):
+        """Test saving and loading the vertices and triangles of a mesh."""
+
+        mesh = minimal_mesh()
+
+        # Add a segmentation.
+        segmentation = Segmentation('seg', [0, 0, 1, 1])
+        mesh.add_segmentation(segmentation)
+
+        # Work in a temporary directory. This guarantees cleanup even on error.
+        with tempfile.TemporaryDirectory() as directory:
+
+            # Save the mesh and reload it.
+            filename = os.path.join(directory, 'mesh.gii')
+            nimesh.io.gifti.save_mesh(filename, mesh)
+            loaded = nimesh.io.load(filename)
+
+            # The coordinate system should not have changed.
+            self.assertEqual(mesh.coordinate_system, loaded.coordinate_system)
+
+            # The loaded data should match the saved data. Because there is no
+            # data manipulation, this should be bit perfect.
+            np.testing.assert_array_equal(mesh.vertices, loaded.vertices)
+            np.testing.assert_array_equal(mesh.triangles, loaded.triangles)
+
+            # The segmentation should not have been saved.
+            self.assertEqual(len(loaded.segmentations), 0)
+
     def test_minimal_save_load(self):
         """Test saving and loading with a minimal mesh."""
 
@@ -214,10 +243,50 @@ class TestGifTI(unittest.TestCase):
             np.testing.assert_array_almost_equal(loaded_segmentation.keys,
                                                  segmentation.keys)
 
+    def test_nameless_segmentation_load(self):
+        """Test loading a segmentation with no name"""
+
+        # Use nibabel directly to save a segmentation with no name.
+        gii = nib.gifti.GiftiImage()
+
+        label_array = nib.gifti.GiftiDataArray(
+            [0, 0, 1, 1],
+            intent='NIFTI_INTENT_LABEL',
+            datatype='NIFTI_TYPE_INT32')
+
+        gii.add_gifti_data_array(label_array)
+
+        # Add the labels of the segmentation.
+        gii_label_table = nib.gifti.GiftiLabelTable()
+        gii_label = nib.gifti.GiftiLabel(0, 255, 0, 0, 0)
+        gii_label.label = 'label 0'
+        gii_label.key = 0
+        gii_label_table.labels.append(gii_label)
+        gii_label = nib.gifti.GiftiLabel(0, 0, 255, 0, 0)
+        gii_label.label = 'label 1'
+        gii_label.key = 1
+        gii_label_table.labels.append(gii_label)
+
+        gii.labeltable = gii_label_table
+
+        # Work in a temporary directory. This guarantees cleanup even on error.
+        with tempfile.TemporaryDirectory() as directory:
+
+            filename = os.path.join(directory, 'nameless-segmentation.gii')
+            nib.save(gii, filename)
+
+            # Load it with nimesh, the name should be unknown.
+            segmentation = nimesh.io.gifti.load_segmentation(filename)
+            self.assertEqual(segmentation.name, 'unknown')
+
     def test_segmentation_save_load(self):
         """Test saving a loading segmentations."""
 
         segmentation = Segmentation('test', [0, 0, 1, 1, 2, 2, 3, 3])
+        segmentation.add_label(0, Label('unknown'))
+        segmentation.add_label(1, Label('red', (1, 0, 0, 1)))
+        segmentation.add_label(2, Label('green', (0, 1, 0, 1)))
+        segmentation.add_label(3, Label('blue', (0, 0, 1, 1)))
 
         # Work in a temporary directory. This guarantees cleanup even on error.
         with tempfile.TemporaryDirectory() as directory:
@@ -230,6 +299,17 @@ class TestGifTI(unittest.TestCase):
             # The loaded data should match the saved data.
             np.testing.assert_array_almost_equal(segmentation.keys,
                                                  loaded.keys)
+
+            # Verify that the labels where loaded correctly.
+            self.assertEqual(len(loaded.labels), 4)
+            self.assertEqual(loaded.labels[0].name, 'unknown')
+            self.assertTupleEqual(loaded.labels[0].color, (0, 0, 0, 0))
+            self.assertEqual(loaded.labels[1].name, 'red')
+            self.assertTupleEqual(loaded.labels[1].color, (1, 0, 0, 1))
+            self.assertEqual(loaded.labels[2].name, 'green')
+            self.assertTupleEqual(loaded.labels[2].color, (0, 1, 0, 1))
+            self.assertEqual(loaded.labels[3].name, 'blue')
+            self.assertTupleEqual(loaded.labels[3].color, (0, 0, 1, 1))
 
     def test_segmentation_load_missing_name(self):
         """Test loading a segmentation with no name"""
@@ -253,12 +333,12 @@ class TestGifTI(unittest.TestCase):
             loaded = nimesh.io.gifti.load_segmentation(filename)
 
             # The loaded data should match the saved data.
-            self.assertEqual('', loaded.name)
+            self.assertEqual('unknown', loaded.name)
             np.testing.assert_array_almost_equal(keys,
                                                  loaded.keys)
 
-    def test_vertex_data_save_load(self):
-        """Test saving and loading vertex data"""
+    def test_mesh_vertex_data_save_load(self):
+        """Test saving and loading vertex data in a mesh"""
 
         mesh = minimal_mesh()
 
@@ -283,3 +363,19 @@ class TestGifTI(unittest.TestCase):
             np.testing.assert_array_almost_equal(
                 loaded.vertex_data['b'].data,
                 vertex_data_b.data)
+
+    def test_vertex_data_save(self):
+        """Test saving vertex data"""
+
+        vertex_data = VertexData('test', [0, 1, 2, 3])
+
+        with tempfile.TemporaryDirectory() as directory:
+
+            # Save the vertex data and reload it.
+            filename = os.path.join(directory, 'vertex.func.gii')
+            nimesh.io.gifti.save_vertex_data(filename, vertex_data)
+            loaded = nimesh.io.gifti.load_vertex_data(filename)
+
+            self.assertEqual(vertex_data.name, loaded.name)
+            np.testing.assert_array_almost_equal(
+                vertex_data.data, loaded.data)

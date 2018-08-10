@@ -23,6 +23,9 @@ def from_freesurfer(subject_directory: str,
 
     """
 
+    warnings.warn('The nimesh.from_freesurfer function is deprecated. Use '
+                  'nimesh.io.load instead.')
+
     # Validate the hemisphere and the surface names.
     if hemisphere not in ('rh', 'lh'):
         raise ValueError('\'hemisphere\' must be \'lh\' of \'rh\', not \'{}\'.'

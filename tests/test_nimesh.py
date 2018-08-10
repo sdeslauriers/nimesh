@@ -89,6 +89,15 @@ class TestMesh(unittest.TestCase):
         np.testing.assert_array_almost_equal(mesh.vertices, vertices)
         np.testing.assert_array_almost_equal(mesh.triangles, triangles)
 
+        # Changing the vertices is permitted.
+        mesh.vertices = np.zeros((4, 3))
+        np.testing.assert_array_almost_equal(mesh.vertices, np.zeros((4, 3)))
+
+        # Changing the number of vertices is not permitted.
+        def set_vertices():
+            mesh.vertices = np.zeros((3, 3))
+        self.assertRaises(ValueError, set_vertices)
+
         # The vertices and triangles must be convertible to numpy arrays.
         self.assertRaises(TypeError, Mesh, None, triangles)
         self.assertRaises(TypeError, Mesh, vertices, None)

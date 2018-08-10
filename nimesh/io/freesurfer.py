@@ -1,22 +1,85 @@
 import os
 import warnings
+from os.path import isfile
+from os.path import join
+from typing import Tuple
+from typing import Union
 
+import nibabel as nib
 import nibabel.freesurfer as nibfs
 import numpy as np
 
+from nimesh import AffineTransform
 from nimesh import CoordinateSystem, Label, Mesh, Segmentation
 
 
-def load(surface: str, annotation: str = None) -> Mesh:
+def load(subject_directory: str, hemisphere: str, surface: str) -> Mesh:
+    """Loads a mesh and associated data from a FreeSurfer subject directory
+
+    Given the path to the root of a FreeSurfer subject directory, loads a mesh,
+    its coordinate system, and segmentations.
+
+    Args:
+        subject_directory: The subject directory from which to load the mesh.
+        hemisphere: The hemisphere to load. Must be either 'lh' or 'rh'.
+        surface: The surface to load. Must be 'pial', 'white', 'inflated', or
+        'smoothwm'.
+
+    Returns:
+        mesh: The requested mesh and associated data.
+
+    Raises:
+        ValueError if `hemisphere` is not 'lh` or 'rh'.
+        ValueError if `surface` is not 'pial', 'white', 'inflated', or
+            'smoothwm'.
+
+    """
+
+    # Validate the hemisphere and the surface names.
+    if hemisphere not in ('rh', 'lh'):
+        raise ValueError('"hemisphere" must be "lh" of "rh", not "{}".'
+                         .format(hemisphere))
+
+    if surface not in ('pial', 'white', 'inflated', 'smoothwm'):
+        raise ValueError('"surface" must be "pial", "white", '
+                         'or "inflated", not "{}".'
+                         .format(surface))
+
+    mesh_filename = join(subject_directory, 'surf', hemisphere + '.' + surface)
+    mesh = load_mesh(mesh_filename)
+
+    # Add the coordinate system and transform to voxel space if possible.
+    coordinate_system, transform = _get_coordinate_system(subject_directory)
+    mesh.coordinate_system = coordinate_system
+
+    if transform is not None:
+        mesh.add_transform(transform)
+
+    # Load the segmentations from annotation files.
+    label_dir = join(subject_directory, 'label')
+
+    desikan_file = join(label_dir, hemisphere + '.aparc.annot')
+    if isfile(desikan_file):
+        mesh.add_segmentation(load_segmentation(desikan_file))
+
+    dkt_file = join(label_dir, hemisphere + '.aparc.DKTatlas.annot')
+    if isfile(dkt_file):
+        mesh.add_segmentation(load_segmentation(dkt_file))
+
+    destrieux_file = join(label_dir, hemisphere + '.aparc.a2009s.annot')
+    if isfile(destrieux_file):
+        mesh.add_segmentation(load_segmentation(destrieux_file))
+
+    return mesh
+
+
+def load_mesh(surface: str) -> Mesh:
     """Loads a FreeSurfer surface mesh.
 
-    Loads a mesh from a FreeSurfer geometry file, optionally loading
-    annotations.
+    Loads a mesh from a FreeSurfer geometry file.
 
     Args:
         surface: The FreeSurfer geometry file, e.g. lh.pial or rh.white.
-        annotation (optional): The annotation file to load, for example
-            lh.aparc.DKTatlas.annot or lh.aparc.annot.
 
     Returns:
         mesh: The loaded mesh.
@@ -28,14 +91,7 @@ def load(surface: str, annotation: str = None) -> Mesh:
     if 'cras' in meta:
         vertices += meta['cras']
 
-    mesh = Mesh(vertices, triangles)
-
-    # Load the annotations, if requested.
-    if annotation is not None:
-        segmentation = load_segmentation(annotation)
-        mesh.add_segmentation(segmentation)
-
-    return mesh
+    return Mesh(vertices, triangles)
 
 
 def load_segmentation(filename: str) -> Segmentation:
@@ -146,3 +202,47 @@ def save_segmentation(filename: str, segmentation: Segmentation):
                      for key, label in segmentation.labels.items()])
     names = [label.name for label in segmentation.labels.values()]
     nibfs.write_annot(filename, keys, ctab, names)
+
+
+def _get_coordinate_system(subject_directory: str) \
+        -> Tuple[CoordinateSystem, Union[None, AffineTransform]]:
+    """Gets the native coordinate system of a FreeSurfer subject
+
+    Gets the native coordinate system of a FreeSurfer subject by looking at
+    the affine of the MRI input. If the MRI does not exists or the
+    coordinate system cannot be identified, the a warning is issued and
+    CoordinateSystem.UNKNOWN is returned.
+
+    Args:
+        subject_directory: The FreeSurfer subject directory.
+
+    Returns:
+        coordinate_system: The native coordinate system of the subject.
+
+    """
+
+    # Verify that the MRI exists.
+    mri_filename = os.path.join(subject_directory, 'mri', 'rawavg.mgz')
+    if not os.path.isfile(mri_filename):
+        warnings.warn('The coordinate system could not be identified because '
+                      'MRI file ({}) does not exist.'
+                      .format(mri_filename))
+        return CoordinateSystem.UNKNOWN, None
+
+    # Get the coordinate system information from the MRI image.
+    affine = nib.load(mri_filename).affine
+    codes = nib.aff2axcodes(affine)
+
+    if codes == ('L', 'P', 'S'):
+        coordinate_system = CoordinateSystem.LPS
+    elif codes == ('R', 'A', 'S'):
+        coordinate_system = CoordinateSystem.RAS
+    else:
+        coordinate_system = CoordinateSystem.UNKNOWN
+        warnings.warn('The coordinate system could not be identified from '
+                      'the MRI ({}).'
+                      .format(mri_filename))
+
+    transform = AffineTransform(CoordinateSystem.VOXEL, np.linalg.inv(affine))
+
+    return coordinate_system, transform

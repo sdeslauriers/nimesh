@@ -13,8 +13,8 @@ from .test_gifti import minimal_mesh
 class TestFreeSurfer(unittest.TestCase):
     """Test the nimesh.io.freesurfer module."""
 
-    def test_surface_load(self):
-        """Test minimal surface loading."""
+    def test_load_mesh(self):
+        """Test nimesh.io.freesurfer.load_mesh function."""
 
         mesh = minimal_mesh()
 
@@ -29,7 +29,7 @@ class TestFreeSurfer(unittest.TestCase):
             # Save and reload the test data.
             filename = os.path.join(directory, 'lh.pial')
             nimesh.io.freesurfer.save(filename, mesh)
-            loaded = nimesh.io.freesurfer.load(filename)
+            loaded = nimesh.io.freesurfer.load_mesh(filename)
 
             # Verify the general shape of the mesh.
             self.assertEqual(mesh.nb_vertices, loaded.nb_vertices)

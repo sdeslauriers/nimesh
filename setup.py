@@ -15,7 +15,7 @@ setup(
                 'meshes.',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    install_requires=['numpy', 'nibabel'],
+    install_requires=['nibabel', 'numpy', 'scipy'],
     extras_requires={
         'visualization': ['vtk'],
     },
