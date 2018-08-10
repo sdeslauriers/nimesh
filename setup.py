@@ -5,7 +5,7 @@ with open('README.md', 'r') as f:
 
 setup(
     name='nimesh',
-    version='0.0.0',
+    version='0.0.1',
     packages=['nimesh', 'nimesh.io'],
     url='https://github.com/sdeslauriers/nimesh',
     license='MIT',
