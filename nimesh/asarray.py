@@ -1,20 +1,30 @@
 from itertools import permutations
+from typing import List
 
 import numpy as np
 from scipy.sparse import csr_matrix
 
 
-def compute_normals(vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
+def apply_affine(vertices, affine):
+    """"""
+
+    homogeneous_vertices = np.hstack((vertices, np.ones((len(vertices), 1))))
+    new_vertices = np.dot(affine, homogeneous_vertices.T)
+    return new_vertices[:3, :].T
+
+
+def compute_normals(vertices: np.ndarray, triangles: np.ndarray) -> np.ndarray:
     """ Computes the vertex normals of a mesh
 
     The normal of a vertex is the average normal of all faces that include
-    the vertex.
+    the vertex. If a vertex is not part of at least one triangles, its normal
+    is set to [0, 0, 1].
 
     Args:
         vertices: A 2D numpy array with a shape of (N, 3)
             where N is the number of vertices.
-        faces: A 2D numpy array with a shape of (M, 3)
-            where M is the number of faces.
+        triangles: A 2D numpy array with a shape of (M, 3)
+            where M is the number of triangles.
 
     Returns:
         normals: A 2D numpy array with a shape of (N, 3) that
@@ -25,27 +35,30 @@ def compute_normals(vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
 
     """
 
-    normals = []
-    for i in range(len(vertices)):
+    # Add the normal of a triangle to each vertex of the triangle.
+    normals: List[List[np.ndarray]] = [[] for _ in range(len(vertices))]
+    for triangle in triangles:
+        normal = np.cross(vertices[triangle[1]] - vertices[triangle[0]],
+                          vertices[triangle[2]] - vertices[triangle[0]])
+        for vertex_id in triangle:
+            normals[vertex_id].append(normal)
 
-        # Get all faces which involve the vertex.
-        contains_vertex = np.any(faces == i, axis=1)
-        vertex_faces = faces[contains_vertex, :]
+    def compute_normal(vertex_normals):
 
-        normal = np.zeros((3,))
-        for face in vertex_faces:
-            normal += np.cross(vertices[face[1]] - vertices[face[0]],
-                               vertices[face[2]] - vertices[face[0]])
+        # Give vertices with no triangles an arbitrary normal
+        if len(vertex_normals) == 0:
+            return np.array([0, 0, 1])
+
+        vertex_normal = np.mean(vertex_normals, axis=0)
 
         # Normalize the normal.
-        norm = np.linalg.norm(normal)
+        norm = np.linalg.norm(vertex_normal)
         if norm == 0:
             raise ValueError('A vertex has a 0 norm normal')
 
-        normal /= norm
-        normals.append(normal)
+        return vertex_normal / norm
 
-    return np.array(normals)
+    return np.array([compute_normal(n) for n in normals])
 
 
 def adjacency_matrix(
