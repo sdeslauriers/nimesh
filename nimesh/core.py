@@ -15,7 +15,7 @@ class AffineTransform(object):
         """Affine transformation from one coordinate system to another.
 
         The AffineTransform represents an affine transformation to a new
-        stereotaxic space.
+        coordinate system.
 
         Args:
             transform_coord_sys: The coordinate system of the data after the
@@ -365,7 +365,7 @@ class Mesh(object):
             raise ValueError('A transform to the current coordinate system '
                              'cannot be added.')
 
-        # Verify if there is already a transform to this coordiante system.
+        # Verify if there is already a transform to this coordinate system.
         targets = [t.transform_coord_sys for t in self._transforms]
         if transform.transform_coord_sys in targets:
             raise ValueError('A transform to {} already exists.'
@@ -495,6 +495,14 @@ class Segmentation(Named):
 
         self._keys = keys
         self._labels = {}
+
+    def __repr__(self):
+        """String representation of the segmentation."""
+        return f'Segmentation(name={self.name}, keys={self.keys})'
+
+    def __str__(self):
+        """Readable string representation of the segmentation."""
+        return self.name
 
     @property
     def keys(self) -> np.array:
