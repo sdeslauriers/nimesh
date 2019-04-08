@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 
 from nimesh import AffineTransform, CoordinateSystem, Mesh
+from nimesh.asarray import upsample
 from nimesh.core import VertexData
 
 
@@ -158,6 +159,58 @@ class TestMesh(unittest.TestCase):
         mesh.transform_to(CoordinateSystem.VOXEL)
         self.assertEqual(mesh.coordinate_system, CoordinateSystem.VOXEL)
         np.testing.assert_array_almost_equal(mesh.vertices, vertices)
+
+
+class TestUpsample(unittest.TestCase):
+    def test_on_single_triangle(self):
+        vertices = np.array([[0, 0, 0],
+                             [2, 0, 0],
+                             [0, 2, 0]], dtype=np.float32)
+        triangles = np.array([[0, 1, 2]], dtype=np.uint)
+
+        gt_upsampled_v = np.array([
+            [0, 0, 0],
+            [2, 0, 0],
+            [0, 2, 0],
+            [1, 0, 0],
+            [0, 1, 0],
+            [1, 1, 0]
+        ], dtype=np.float32)
+
+        gt_upsampled_t = np.array([
+            [0, 3, 4],
+            [1, 3, 5],
+            [2, 4, 5],
+            [3, 4, 5]
+        ], dtype=np.uint)
+
+        vv, tt = upsample(vertices, triangles)
+
+        self.assertEqual(tt.shape[0], 4 * triangles.shape[0])
+
+        self.assertEqual(tt.shape[1], 3)
+        self.assertEqual(vv.shape[1], 3)
+
+        self.assertEqual(gt_upsampled_v.shape[0], vv.shape[0])
+        self.assertEqual(gt_upsampled_t.shape[0], tt.shape[0])
+
+        np.testing.assert_almost_equal(vv, gt_upsampled_v)
+        np.testing.assert_almost_equal(tt, gt_upsampled_t)
+
+    def test_coplanar(self):
+        vertices = np.array([[0, 0, 0],
+                             [2, 0, 0],
+                             [0, 2, 0]], dtype=np.float32)
+        triangles = np.array([[0, 1, 2]], dtype=np.uint)
+
+        vv, tt = upsample(vertices, triangles)
+
+        matrix = np.ones((4, 4))
+        matrix[: -1, : -1] = vertices[: 3, :]
+        for k in range(3, len(vv)):
+            matrix[-1, : -1] = vv[k, :]
+            # the volume of the solid identified by four points must be zero
+            self.assertAlmostEqual(np.linalg.det(matrix), 0.0)
 
 
 class TestVertexData(unittest.TestCase):

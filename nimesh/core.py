@@ -2,6 +2,7 @@ import numpy as np
 from enum import IntEnum
 from typing import List, Sequence, Union
 
+from .asarray import icosahedron, project_to_sphere, upsample
 from .mixins import Named, ListOfNamed
 
 
@@ -579,3 +580,27 @@ class VertexData(Named):
     def nb_vertices(self):
         """Returns the number of vertices associated with the data"""
         return len(self.data)
+
+
+def icosphere(n: int = 0) -> Mesh:
+    """ Returns a icosphere of radius 1.
+
+    Args:
+        n: a non-negative integer that defines how many times the icosahedron
+            will be upsampled.
+
+    Returns:
+        sphere: A Mesh object that defines the wanted icosphere.
+
+    Raises:
+        ValueError if `n` is not a non-negative integer.
+
+    """
+    n = int(n)
+    if n < 0:
+        raise ValueError('The number of upsamplings must be non negative.')
+    v, t = icosahedron()
+    for k in range(n):
+        v, t = upsample(v, t)
+    v = project_to_sphere(v)
+    return Mesh(v, t)
