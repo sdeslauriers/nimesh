@@ -5,6 +5,7 @@ import nibabel as nib
 import numpy as np
 from nimesh.core import AffineTransform, CoordinateSystem, Mesh
 from nimesh.core import Label, Segmentation
+from nimesh.core import icosphere
 from nimesh import io
 
 
