@@ -5,6 +5,7 @@ from typing import List, Sequence, Union
 from scipy.sparse import csr_matrix
 
 from nimesh.asarray import adjacency_matrix
+from nimesh.asarray import icosahedron, project_to_sphere, upsample
 from nimesh.mixins import Named, ListOfNamed
 
 
@@ -604,3 +605,23 @@ class VertexData(Named):
     def nb_vertices(self):
         """Returns the number of vertices associated with the data"""
         return len(self.data)
+
+
+def icosphere(nb_upsamplings: int = 0) -> Mesh:
+    """ Returns a icosphere of radius 1.
+    Args:
+        nb_upsamplings: a non-negative integer that defines how many times the
+            icosahedron will be upsampled.
+    Returns:
+        sphere: A Mesh object that defines the wanted icosphere.
+    Raises:
+        ValueError if `nb_upsamplings` is not a non-negative integer.
+    """
+    nb_upsamplings = int(nb_upsamplings)
+    if nb_upsamplings < 0:
+        raise ValueError('The number of upsamplings must be non negative.')
+    v, t = icosahedron()
+    for _ in range(nb_upsamplings):
+        v, t = upsample(v, t)
+    v = project_to_sphere(v)
+    return Mesh(v, t)
