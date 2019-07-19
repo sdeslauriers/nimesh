@@ -13,6 +13,16 @@ from nimesh import AffineTransform
 from nimesh import CoordinateSystem, Label, Mesh, Segmentation
 
 
+# The valid freesurfer surfaces.
+_VALID_SURFACES = (
+    'pial',
+    'white',
+    'inflated',
+    'smoothwm',
+    'sphere',
+)
+
+
 def load(subject_directory: str, hemisphere: str, surface: str) -> Mesh:
     """Loads a mesh and associated data from a FreeSurfer subject directory
 
@@ -40,10 +50,9 @@ def load(subject_directory: str, hemisphere: str, surface: str) -> Mesh:
         raise ValueError('"hemisphere" must be "lh" of "rh", not "{}".'
                          .format(hemisphere))
 
-    if surface not in ('pial', 'white', 'inflated', 'smoothwm'):
-        raise ValueError('"surface" must be "pial", "white", '
-                         'or "inflated", not "{}".'
-                         .format(surface))
+    if surface not in _VALID_SURFACES:
+        raise ValueError(
+            f'"surface" must be in {_VALID_SURFACES}, not "{surface}".')
 
     mesh_filename = join(subject_directory, 'surf', hemisphere + '.' + surface)
     mesh = load_mesh(mesh_filename)
