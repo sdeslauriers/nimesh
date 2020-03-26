@@ -6,6 +6,7 @@ import numpy as np
 import warnings
 
 from scipy.sparse import csr_matrix
+from scipy.sparse import diags
 
 
 def apply_affine(vertices, affine):
@@ -146,6 +147,35 @@ def icosahedron() -> (np.ndarray, np.ndarray):
     vertices = project_to_sphere(np.asarray(vertices))
     triangles = np.asarray(triangles)
     return vertices, triangles
+
+
+def laplacian_matrix(
+        triangles: np.ndarray,
+        nb_vertices: int = None) -> csr_matrix:
+    """Constructs the Laplacian matrix of a mesh
+
+    Constructs the Laplacian matrix of a mesh given its triangles. To be
+    able to handle very large meshes, the matrix is return as a
+    scipy.sparse.csr_matrix.
+
+    Args:
+        triangles: A numpy array with a shape of (n, 3) where each row contains
+            the vertex indices of a triangle of a mesh.
+        nb_vertices: The total number of the mesh. Specifying the number of
+            vertices is essential if the mesh contains vertices that are not
+            part of any triangle. If not specified, then
+            np.max(triangles) + 1 is used.
+
+    Returns:
+        laplacian_matrix: The adjacency matrix of the list of triangles as a
+            csr_matrix. Use `todense` to convert to a numpy array.
+
+    """
+
+    adjacency = adjacency_matrix(triangles, nb_vertices)
+    vertex_degree = np.array(adjacency.sum(axis=1)).ravel()
+    vertex_degree[vertex_degree == 0] = 1
+    return diags(vertex_degree) - adjacency
 
 
 def project_to_sphere(vertices: np.ndarray) -> np.ndarray:

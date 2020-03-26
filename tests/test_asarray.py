@@ -6,6 +6,7 @@ import numpy as np
 from nimesh.asarray import adjacency_matrix
 from nimesh.asarray import compute_normals
 from nimesh.asarray import icosahedron
+from nimesh.asarray import laplacian_matrix
 from nimesh.asarray import project_to_sphere
 from nimesh.asarray import upsample
 from nimesh.core import icosphere
@@ -135,6 +136,27 @@ class TestIcosahedron(TestCase):
             edge_length.append(np.linalg.norm(vertices[e[0]] - vertices[e[1]]))
 
         self.assertEqual(len(np.unique(edge_length)), 1)
+
+
+class TestLaplacianMatrix(TestCase):
+    """Test the nimesh.asarray.laplacian_matrix method."""
+
+    def test_simple(self):
+        """Test using a very simple mesh"""
+
+        triangles = np.array([
+            [0, 1, 2]
+        ], dtype=np.uint8)
+
+        laplacian = laplacian_matrix(triangles, nb_vertices=4)
+        expected = np.array([
+            [2, -1, -1, 0],
+            [-1, 2, -1, 0],
+            [-1, -1, 2, 0],
+            [0, 0, 0, 1],
+        ], dtype=np.float)
+
+        np.testing.assert_array_equal(laplacian.todense(), expected)
 
 
 class TestProjectOnSphere(TestCase):
