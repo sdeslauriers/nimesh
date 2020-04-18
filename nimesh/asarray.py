@@ -42,10 +42,28 @@ def compute_normals(vertices: np.ndarray, triangles: np.ndarray) -> np.ndarray:
     # Add the normal of a triangle to each vertex of the triangle.
     normals: List[List[np.ndarray]] = [[] for _ in range(len(vertices))]
     for triangle in triangles:
+
+        # Compute the normal of the triangle
         normal = np.cross(vertices[triangle[1]] - vertices[triangle[0]],
                           vertices[triangle[2]] - vertices[triangle[0]])
-        for vertex_id in triangle:
-            normals[vertex_id].append(normal)
+        norm = np.linalg.norm(normal)
+        if norm == 0:
+            raise ValueError('A triangle has a 0 norm normal')
+        normal = normal / norm
+
+        # Compute the angles of each vertex.
+        def get_angle(i, j, k):
+            u = vertices[triangle[i]] - vertices[triangle[k]]
+            v = vertices[triangle[j]] - vertices[triangle[k]]
+            return np.arccos(
+                np.dot(u, v) / np.linalg.norm(u) / np.linalg.norm(v))
+
+        angles = [get_angle(0, 1, 2), get_angle(1, 0, 2), get_angle(2, 0, 1)]
+
+        for vertex_id, angle in zip(triangle, angles):
+
+            # Weight the vertex normal by the angle of the point.
+            normals[vertex_id].append(normal * angle)
 
     def compute_normal(vertex_normals):
 
