@@ -58,7 +58,7 @@ def compute_normals(vertices: np.ndarray, triangles: np.ndarray) -> np.ndarray:
             return np.arccos(
                 np.dot(u, v) / np.linalg.norm(u) / np.linalg.norm(v))
 
-        angles = [get_angle(0, 1, 2), get_angle(1, 0, 2), get_angle(2, 0, 1)]
+        angles = [get_angle(1, 2, 0), get_angle(0, 2, 1), get_angle(0, 1, 2)]
 
         for vertex_id, angle in zip(triangle, angles):
 
@@ -71,7 +71,7 @@ def compute_normals(vertices: np.ndarray, triangles: np.ndarray) -> np.ndarray:
         if len(vertex_normals) == 0:
             return np.array([0, 0, 1])
 
-        vertex_normal = np.mean(vertex_normals, axis=0)
+        vertex_normal = np.sum(vertex_normals, axis=0)
 
         # Normalize the normal.
         norm = np.linalg.norm(vertex_normal)
